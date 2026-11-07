@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 2 │ Runtimes │ Providers │ MCP │ Skills │
+ ╭ Cloud · 2 of 2 models ─────────────────────────────────╮
+ │Ollama is installed but stopped                         │
+ │To start it: systemctl --user start ollama.service      │
+ │This also starts the other containers in local-ai.pod.  │
+ │                                                        │
+ │/ type to filter                                        │
+ │                                                        │
+ │─ Free · 1 ──────────────────────────────────────────── │
+ │❯ ★ openrouter/free-coder              openrouter  tools│
+ │─ Paid · 1 ──────────────────────────────────────────── │
+ │  ☁ gpt-5-mini                             openai  tools│
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ ╰────────────────────────────────────────────────────────╯
+  enter start  ↑↓ choose  type to filter  ^F free ○  k key

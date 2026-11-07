@@ -1,0 +1,38 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+
+                                            █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
+                                            █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
+                                            █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
+                                           a coding agent for your own machine
+
+   Home │ Models 5 │ Runtimes 2 │ Providers 3 │ MCP 4 │ Skills 4 │ Tools 2 │ Settings │
+  ╭ Runtimes and containers ─────────────────────────────────────────────────────────────────────────────────────────╮
+  │ podman 5.8.9 rootless                                                  │ Ollama                                  │
+  │ Runtimes ────────────────────────────────────────────────────────────  │  running 0.40.14                        │
+  │❯ ● Ollama  running 0.40.14                     http://localhost:11434  │                                         │
+  │  ◐ llama.cpp (detected)  stopped · enter starts                        │ Address  http://localhost:11434         │
+  │ Containers ──────────────────────────────────────────────────────────  │ Run by   podman container `ollama` in   │
+  │  ● webui-proxy                                       Up 4 days  :8443  │ pod `local-ai`                          │
+  │ pod local-ai  :3000 :8880 :11434                                       │ Image    docker.io/ollama/ollama:rocm   │
+  │    ● ollama Ollama                                        Up 23 hours  │ GPU attached (/dev/dri, /dev/kfd)       │
+  │    ● open-webui                                           Up 23 hours  │                                         │
+  │ pod pod_firecrawl  :3002                                               │ Yours: re-code only starts it when you  │
+  │    ○ firecrawl_api_1                           Exited (0) 2 hours ago  │ say so, and never stops or changes it.  │
+  │ ? http://127.0.0.1:8080: answers HTTP 404, but not like a runtime re-… │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
+  Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
+                                  enter start  ↑↓ choose  tab next  ^R rescan  ^C quit

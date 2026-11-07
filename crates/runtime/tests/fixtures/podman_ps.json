@@ -1,0 +1,227 @@
+[
+ {
+  "Id": "6ee06ec90230ea7589b8c1715f0d77d905d560d839ab95645df9c3f99e444fd0",
+  "Names": [
+   "firecrawl_api_1"
+  ],
+  "Image": "localhost/firecrawl_api:latest",
+  "State": "running",
+  "Status": "Up 4 days",
+  "Pod": "5b69cc0a89dd7ce03bc31292dc5dfc54db31a5912decdb41cd0142ac987aabc9",
+  "PodName": "",
+  "Ports": [
+   {
+    "host_ip": "",
+    "container_port": 3002,
+    "host_port": 3002,
+    "range": 1,
+    "protocol": "tcp"
+   }
+  ],
+  "Labels": {
+   "PODMAN_SYSTEMD_UNIT": "podman-compose@firecrawl.service",
+   "com.docker.compose.container-number": "1",
+   "com.docker.compose.project": "firecrawl",
+   "com.docker.compose.project.config_files": "docker-compose.selfhost.yaml",
+   "com.docker.compose.project.working_dir": "/home/echo/firecrawl",
+   "com.docker.compose.service": "api",
+   "io.buildah.version": "1.43.2",
+   "io.podman.compose.config-hash": "7c36acc0ed88d527c132e3a0d15e84d1414c6fdf9ce994ba8dd3a4e0389fcfa3",
+   "io.podman.compose.project": "firecrawl",
+   "io.podman.compose.service": "api",
+   "io.podman.compose.version": "1.6.0"
+  },
+  "IsInfra": false,
+  "Command": [
+   "node",
+   "dist/src/harness.js",
+   "--start-docker"
+  ],
+  "Exited": false,
+  "Pid": 7637,
+  "ExitCode": 0
+ },
+ {
+  "Id": "93662f61192241b520e298a95db093eea5246c91e692b4adc797e9261e6e95a4",
+  "Names": [
+   "webui-proxy"
+  ],
+  "Image": "docker.io/library/caddy:2-alpine",
+  "State": "exited",
+  "Status": "Exited (0) 2 hours ago",
+  "Pod": "",
+  "PodName": "",
+  "Ports": [
+   {
+    "host_ip": "",
+    "container_port": 443,
+    "host_port": 8443,
+    "range": 1,
+    "protocol": "tcp"
+   }
+  ],
+  "Labels": {
+   "PODMAN_SYSTEMD_UNIT": "webui-proxy.service",
+   "org.opencontainers.image.description": "a powerful, enterprise-ready, open source web server with automatic HTTPS written in Go",
+   "org.opencontainers.image.documentation": "https://caddyserver.com/docs",
+   "org.opencontainers.image.licenses": "Apache-2.0",
+   "org.opencontainers.image.source": "https://github.com/caddyserver/caddy-docker",
+   "org.opencontainers.image.title": "Caddy",
+   "org.opencontainers.image.url": "https://caddyserver.com",
+   "org.opencontainers.image.vendor": "Light Code Labs",
+   "org.opencontainers.image.version": "v2.11.7"
+  },
+  "IsInfra": false,
+  "Command": [
+   "caddy",
+   "run",
+   "--config",
+   "/etc/caddy/Caddyfile",
+   "--adapter",
+   "caddyfile"
+  ],
+  "Exited": true,
+  "Pid": 0,
+  "ExitCode": 0
+ },
+ {
+  "Id": "34915b15cc9d19731ee09a92da42eea770c57bf466c7df6feb8e98d368f9543c",
+  "Names": [
+   "local-ai-infra"
+  ],
+  "Image": "",
+  "State": "running",
+  "Status": "Up 22 hours",
+  "Pod": "84e3c3dcb0dbfb942845474151f5ab494a160cc5ecca39387e6853bb76ec83be",
+  "PodName": "",
+  "Ports": [
+   {
+    "host_ip": "",
+    "container_port": 8080,
+    "host_port": 3000,
+    "range": 1,
+    "protocol": "tcp"
+   },
+   {
+    "host_ip": "",
+    "container_port": 8880,
+    "host_port": 8880,
+    "range": 1,
+    "protocol": "tcp"
+   },
+   {
+    "host_ip": "",
+    "container_port": 11434,
+    "host_port": 11434,
+    "range": 1,
+    "protocol": "tcp"
+   }
+  ],
+  "Labels": {
+   "PODMAN_SYSTEMD_UNIT": "local-ai-pod.service"
+  },
+  "IsInfra": true,
+  "Command": null,
+  "Exited": false,
+  "Pid": 2505124,
+  "ExitCode": 0
+ },
+ {
+  "Id": "f64b81d1d0032be82eb4c393c41e27d8fae7baf343f69fa129db21be87ad7169",
+  "Names": [
+   "ollama"
+  ],
+  "Image": "docker.io/ollama/ollama:rocm",
+  "State": "running",
+  "Status": "Up 22 hours",
+  "Pod": "84e3c3dcb0dbfb942845474151f5ab494a160cc5ecca39387e6853bb76ec83be",
+  "PodName": "",
+  "Ports": [
+   {
+    "host_ip": "",
+    "container_port": 8080,
+    "host_port": 3000,
+    "range": 1,
+    "protocol": "tcp"
+   },
+   {
+    "host_ip": "",
+    "container_port": 8880,
+    "host_port": 8880,
+    "range": 1,
+    "protocol": "tcp"
+   },
+   {
+    "host_ip": "",
+    "container_port": 11434,
+    "host_port": 11434,
+    "range": 1,
+    "protocol": "tcp"
+   }
+  ],
+  "Labels": {
+   "PODMAN_SYSTEMD_UNIT": "ollama.service",
+   "org.opencontainers.image.version": "24.04"
+  },
+  "IsInfra": false,
+  "Command": [
+   "serve"
+  ],
+  "Exited": false,
+  "Pid": 2505194,
+  "ExitCode": 0
+ },
+ {
+  "Id": "5a35ebaebeb64f0770e307f5e5396eab6fdc9fcdef04aedd3f6f2e12d10ddc9a",
+  "Names": [
+   "open-webui"
+  ],
+  "Image": "ghcr.io/open-webui/open-webui:main",
+  "State": "running",
+  "Status": "Up 22 hours",
+  "Pod": "84e3c3dcb0dbfb942845474151f5ab494a160cc5ecca39387e6853bb76ec83be",
+  "PodName": "",
+  "Ports": [
+   {
+    "host_ip": "",
+    "container_port": 8080,
+    "host_port": 3000,
+    "range": 1,
+    "protocol": "tcp"
+   },
+   {
+    "host_ip": "",
+    "container_port": 8880,
+    "host_port": 8880,
+    "range": 1,
+    "protocol": "tcp"
+   },
+   {
+    "host_ip": "",
+    "container_port": 11434,
+    "host_port": 11434,
+    "range": 1,
+    "protocol": "tcp"
+   }
+  ],
+  "Labels": {
+   "PODMAN_SYSTEMD_UNIT": "open-webui.service",
+   "org.opencontainers.image.created": "2026-11-03T12:22:42.284Z",
+   "org.opencontainers.image.description": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
+   "org.opencontainers.image.licenses": "NOASSERTION",
+   "org.opencontainers.image.revision": "c38885a1a737da4968f157092f304f3b5481d0bf",
+   "org.opencontainers.image.source": "https://github.com/open-webui/open-webui",
+   "org.opencontainers.image.title": "open-webui",
+   "org.opencontainers.image.url": "https://github.com/open-webui/open-webui",
+   "org.opencontainers.image.version": "main"
+  },
+  "IsInfra": false,
+  "Command": [
+   "bash",
+   "start.sh"
+  ],
+  "Exited": false,
+  "Pid": 2505208,
+  "ExitCode": 0
+ }
+]

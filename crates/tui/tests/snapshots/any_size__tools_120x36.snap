@@ -1,0 +1,38 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+
+                                            █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
+                                            █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
+                                            █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
+                                           a coding agent for your own machine
+
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Tools 2 │ Settings │
+  ╭ Custom tools ────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │❯ ● search-docs                                         1 parameter │ search-docs                                 │
+  │  ○ off-tool                                          no parameters │ Search the project documentation            │
+  │                                                                    │ Runs                                        │
+  │                                                                    │ rg {query} docs                             │
+  │                                                                    │ Parameters                                  │
+  │                                                                    │ query                                       │
+  │                                                                    │                                             │
+  │                                                                    │ A tool-capable model uses this when you're  │
+  │                                                                    │ in a project folder. Pick one with Ctrl+L.  │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
+  Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
+                           a add  e edit  space on/off  d delete  tab next  ^R rescan  ^C quit

@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ ◆ re-code api-server › The retry loop in auth.r… ── DEMO ╮
+╭ Context ─────────────────────────────────────────────────╮
+│ Context ~8.8k / 16k (estimated) · last reported 8902     │
+│ in, 7410 from cache                                      │
+│                                                          │
+│ System prompt          ────────────────── ~410           │
+│ Skills index           ────────────────── ~120           │
+│ Tool definitions       ━●──────────────── ~1.8k          │
+│ Conversation           ━━●─────────────── ~2.3k          │
+│ Tool results           ━━━━●───────────── ~4.1k          │
+│ Shortened results      ────────────────── ~90            │
+│ Images                 ────────────────── 1 not counted  │
+│                                                          │
+│   read src/auth.rs · ~2.1k                               │
+│   shell cargo test · ~1.5k                               │
+│                                                          │
+│ Reserved for the reply: 2k · Free until compaction:      │
+│ ~4.1k                                                    │
+╰──────────────────────────────────────────────────────────╯
+  enter send  alt+enter new line  pgup scroll  ^K commands

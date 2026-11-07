@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+ ╭ Settings ──────────────────────────────────────────────╮
+ │Appearance and behaviour ────────────────────────────── │
+ │❯ Theme                                      Driftwave  │
+ │  Variant                                       normal  │
+ │  Accent                                   theme's own  │
+ │  Theme background                    off (terminal's)  │
+ │  Context size (local models)             16384 tokens  │
+ │  Idle compaction                                  off  │
+ │  Notifications                                   both  │
+ │  Line numbers in code                             off  │
+ │                                                        │
+ │API keys ────────────────────────────────────────────── │
+ │  openrouter                                    no key  │
+ │  opencode-zen                                  no key  │
+ │  ollama-cloud                                  no key  │
+ ╰────────────────────────────────────────────────────────╯
+ enter change  ←→ adjust  ↑↓ choose  d remove key  tab next

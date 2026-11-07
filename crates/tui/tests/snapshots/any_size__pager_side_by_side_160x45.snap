@@ -1,0 +1,49 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ edit src/auth.rs  (q closes · n/p files · s side by side · e edit) ──────────────────────────────────────────────────────────────────────────────────────────╮
+│ --- a/src/auth.rs                                                                                                                                            │
+│ +++ b/src/auth.rs                                                                                                                                            │
+│ @@ -39,7 +39,7 @@                                                                                                                                            │
+│      for attempt in 0..MAX_RETRIES {                                         │      for attempt in 0..MAX_RETRIES {                                          │
+│ -                let _delay = retry_delay(attempt);                          │ +                tokio::time::sleep(retry_delay(attempt)).await;              │
+│      }                                                                       │      }                                                                        │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+│                                                                                                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

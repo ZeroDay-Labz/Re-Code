@@ -1,0 +1,38 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+
+                                            █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
+                                            █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
+                                            █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
+                                           a coding agent for your own machine
+
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Tools 2 │ Settings │
+  ╭ MCP servers ─────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │❯ ● rustrover                                        http  40 tools │ rustrover                                   │
+  │  ✗ broken                                            stdio  failed │ Address                                     │
+  │  ◐ a-server-with-a-very-long-name-that-cann…  stdio  starts on use │ http://127.0.0.1:64522/stream               │
+  │  ○ off                                                  stdio  off │                                             │
+  │                                                                    │ Discover-then-call (default): the agent     │
+  │                                                                    │ lists this server's tools, then calls one,  │
+  │                                                                    │ so no schemas are sent until needed. Press  │
+  │                                                                    │ x to expose it directly.                    │
+  │                                                                    │ All of its tools are offered. Press f to    │
+  │                                                                    │ choose some.                                │
+  │                                                                    │                                             │
+  │                                                                    │ Connected to RustRover MCP Server 2026.3,   │
+  │                                                                    │ offering 40 tools.                          │
+  │                                                                    │ Sending all their schemas would cost about  │
+  │                                                                    │ ~18.2k tokens on every request (estimated), │
+  │                                                                    │ so re-code will load them only on demand.   │
+  │                                                                    │                                             │
+  │                                                                    │ tool_0, tool_1, tool_2, tool_3, tool_4,     │
+  │                                                                    │ tool_5, tool_6, tool_7, tool_8, tool_9,     │
+  │                                                                    │ tool_10, tool_11, …                         │
+  │                                                                    │                                             │
+  │                                                                    │ A tool-capable model uses this when you're  │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
+  Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
+   a add  p preset  s search  f tools  t test  i import  e edit  space on/off  x expose  d delete  tab next  ^R rescan

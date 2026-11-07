@@ -1,0 +1,16 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+           ◆ re-code
+
+  Home │ Models │ Runtimes │
+ ⠋ Looking for models…
+
+
+
+
+
+
+
+ tab next  ^R rescan  ^C quit

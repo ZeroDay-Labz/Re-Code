@@ -1,0 +1,16 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+│ ↪retry_delay(attempt);     │
+│ +                          │
+│ ↪tokio::time::sleep(retry_ │
+│ ↪delay(attempt)).await;    │
+│              }             │
+│              Err(error)    │
+│ ↪=> return Err(error),     │
+│          }                 │
+╰────────────────────────────╯
+ ▲ edit src/auth.rs y/a/p/n/d
+ ❯  Waiting for your answer a…
+▲ Needs approval │ DEMO

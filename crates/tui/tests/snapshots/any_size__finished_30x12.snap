@@ -1,0 +1,16 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+  • Worth adding if this
+    shows up in logs.
+
+│ Try resizing the window
+│ now. Text, this table and
+│ the code above all reflow.
+│ 世界 and 🦀 are here to
+│ test wide characters.
+
+── 4 tools · 6.0k in (5.7k… ──
+ ❯  Type anything and press E…
+● Ready │ DEMO │ ctx ~6.0k/32k

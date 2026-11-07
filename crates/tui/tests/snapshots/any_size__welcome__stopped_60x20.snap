@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 0 │ Runtimes │ Providers │ MCP │ Skills │
+ ╭ Ollama ────────────────────────────────────────────────╮
+ │Ollama is installed but stopped                         │
+ │                                                        │
+ │To start it: systemctl --user start ollama.service      │
+ │                                                        │
+ │This also starts the other containers in local-ai.pod.  │
+ │                                                        │
+ │Press Ctrl+R to look again.                             │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ ╰────────────────────────────────────────────────────────╯
+                tab next  ^R rescan  ^C quit

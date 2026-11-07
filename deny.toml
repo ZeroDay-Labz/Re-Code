@@ -1,0 +1,18 @@
+[advisories]
+ignore = [
+    # bincode is unmaintained, but this isn't a vulnerability report. It arrives through syntect, which only uses it to
+    # decode the syntax definitions compiled into syntect itself, so it never sees untrusted input. Replacing syntect
+    # with tree-sitter highlighting would remove it. Revisit when code navigation brings in tree-sitter.
+    { id = "RUSTSEC-2025-0141", reason = "only decodes data embedded in syntect, never untrusted input" },
+]
+
+[licenses]
+unused-allowed-license = "allow"
+allow = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "CDLA-Permissive-2.0", "ISC", "MIT", "MPL-2.0", "Unicode-3.0", "Unlicense", "Zlib"]
+
+[bans]
+multiple-versions = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

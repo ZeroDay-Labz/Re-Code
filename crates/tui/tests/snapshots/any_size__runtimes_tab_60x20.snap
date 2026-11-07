@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 5 │ Runtimes 2 │ Providers 3 │ MCP 4 │
+ ╭ Runtimes and containers ───────────────────────────────╮
+ │ podman 5.8.9 rootless                                  │
+ │ Runtimes ───────────────────────────────────────────── │
+ │❯ ● Ollama  running 0.40.14      http://localhost:11434 │
+ │  ◐ llama.cpp (detected)  stopped · enter starts        │
+ │ Containers ─────────────────────────────────────────── │
+ │  ● webui-proxy                        Up 4 days  :8443 │
+ │ pod local-ai  :3000 :8880 :11434                       │
+ │    ● ollama Ollama                         Up 23 hours │
+ │    ● open-webui                            Up 23 hours │
+ │ pod pod_firecrawl  :3002                               │
+ │    ○ firecrawl_api_1            Exited (0) 2 hours ago │
+ │ ? http://127.0.0.1:8080: answers HTTP 404, but not lik…│
+ │                                                        │
+ │                                                        │
+ ╰────────────────────────────────────────────────────────╯
+    enter start  ↑↓ choose  tab next  ^R rescan  ^C quit

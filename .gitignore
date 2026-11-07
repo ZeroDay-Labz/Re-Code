@@ -1,0 +1,5 @@
+/target
+
+# Ignore every folder named “tests” (no matter where it lives)
+ tests/
+ **/tests/

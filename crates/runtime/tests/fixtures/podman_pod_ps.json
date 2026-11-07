@@ -1,0 +1,76 @@
+[
+ {
+  "Id": "84e3c3dcb0dbfb942845474151f5ab494a160cc5ecca39387e6853bb76ec83be",
+  "Name": "local-ai",
+  "Status": "Running",
+  "Labels": {
+   "PODMAN_SYSTEMD_UNIT": "local-ai-pod.service"
+  },
+  "InfraId": "34915b15cc9d19731ee09a92da42eea770c57bf466c7df6feb8e98d368f9543c",
+  "Containers": [
+   {
+    "Id": "34915b15cc9d19731ee09a92da42eea770c57bf466c7df6feb8e98d368f9543c",
+    "Names": "local-ai-infra",
+    "Status": "running",
+    "RestartCount": 0
+   },
+   {
+    "Id": "f64b81d1d0032be82eb4c393c41e27d8fae7baf343f69fa129db21be87ad7169",
+    "Names": "ollama",
+    "Status": "running",
+    "RestartCount": 0
+   },
+   {
+    "Id": "5a35ebaebeb64f0770e307f5e5396eab6fdc9fcdef04aedd3f6f2e12d10ddc9a",
+    "Names": "open-webui",
+    "Status": "running",
+    "RestartCount": 0
+   },
+   {
+    "Id": "5083a95355b8b1f4ae8d114f5dbce48306007dc6bc07f45d77cf18476d189eb9",
+    "Names": "kokoro-tts",
+    "Status": "running",
+    "RestartCount": 0
+   }
+  ]
+ },
+ {
+  "Id": "5b69cc0a89dd7ce03bc31292dc5dfc54db31a5912decdb41cd0142ac987aabc9",
+  "Name": "pod_firecrawl",
+  "Status": "Running",
+  "Labels": {},
+  "InfraId": "",
+  "Containers": [
+   {
+    "Id": "537c315466d003b3a1cf6be1e7be228a4f5759f2b9a9656b99eba4d0fc4d5e5d",
+    "Names": "firecrawl_playwright-service_1",
+    "Status": "running",
+    "RestartCount": 0
+   },
+   {
+    "Id": "4f056551444c269854e8f08772d6135808dbea7d942eab8c51481e8cffd02cbf",
+    "Names": "firecrawl_redis_1",
+    "Status": "running",
+    "RestartCount": 0
+   },
+   {
+    "Id": "55620519b46ae63a8b4292a9fa4bac0e583196afa59da4d829f0482b93818305",
+    "Names": "firecrawl_rabbitmq_1",
+    "Status": "running",
+    "RestartCount": 0
+   },
+   {
+    "Id": "a7e9eb89f02540764f8286dfbf264f45f0ecef002a2f2e8f1da98273110fd7f8",
+    "Names": "firecrawl_nuq-postgres_1",
+    "Status": "running",
+    "RestartCount": 0
+   },
+   {
+    "Id": "6ee06ec90230ea7589b8c1715f0d77d905d560d839ab95645df9c3f99e444fd0",
+    "Names": "firecrawl_api_1",
+    "Status": "running",
+    "RestartCount": 0
+   }
+  ]
+ }
+]

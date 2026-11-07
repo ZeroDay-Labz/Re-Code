@@ -1,0 +1,34 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ ◆ re-code api-server › The retry loop in auth.rs never backs off. Fix it and run the te… ── DEMO ╮
+│          Ok(response) => return Ok(response),                                                    │
+│          Err(error) if error.is_transient() => {                                                 │
+│              ╭ Write RE-CODE.md? ─────────────────────────────────────────────────╮              │
+│          }   │ /home/someone/code/api-server/RE-CODE.md doesn't exist yet. /init  │              │
+│          Err(│ would write this, from what the folder shows:                      │              │
+│      }       │                                                                    │              │
+│  }           │   # api-server                                                     │              │
+│              │                                                                    │              │
+│ Attempt │ Del│   Instructions for re-code (also read: AGENTS.md, CLAUDE.md).      │              │
+│ ────────┼────│                                                                    │              │
+│ 1       │ 200│   ## About                                                         │              │
+│ 2       │ 400│                                                                    │              │
+│ 3       │ 800│   - A Rust workspace with crates: crates/core, crates/app.         │              │
+│              │                                                                    │              │
+│ Things to che│   ## Commands                                                      │              │
+│              │                                                                    │              │
+│ 1. MAX_RETRIE│   - Test: `cargo test --workspace`                                 │              │
+│ 2. The final │   - Full check before finishing: `./scripts/check.sh`              │              │
+│   • Worth add│                                                                    │              │
+│              │   ## Compact instructions                                          │              │
+│ │ Try resizin│   … 2 more lines                                                   │ and 🦀 are   │
+│ │ here to tes│                                                                    │              │
+│              │ You can edit it afterwards with /memory. Write it?                 │              │
+│ ── 4 tools · │                                                                    │              │
+╰──────────────│ y yes  n no                                                        │──────────────╯
+╭ ● Ready │ DEM╰────────────────────────────────────────────────────────────────────╯──────────────╮
+│ ❯  Type anything and press Enter to replay the demo                                              │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+        enter send  alt+enter new line  pgup scroll  ^K commands  ^B panel  F1 keys  ^C quit

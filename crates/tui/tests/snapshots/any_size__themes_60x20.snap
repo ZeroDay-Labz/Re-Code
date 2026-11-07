@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ ◆ re-code api-server › The retry loop in auth.r… ── DEMO ╮
+╭ Themes ──────────────────────────────────────────────────╮
+│   Driftwave                            ████████████ dark │
+│   Driftwave Light                     ████████████ light │
+│   Catppuccin Mocha                     ████████████ dark │
+│   Catppuccin Latte                    ████████████ light │
+│ ❯ Tokyo Night  ‹ normal ›              ████████████ dark │
+│   Gruvbox                              ████████████ dark │
+│   Nord                                 ████████████ dark │
+│   Dracula                              ████████████ dark │
+│   Rosé Pine                            ████████████ dark │
+│   Solarized Dark                       ████████████ dark │
+│   Solarized Light                     ████████████ light │
+│                                                          │
+│ ↑↓ theme  ←→ dim/bright  a accent: theme's own           │
+│ enter keep  esc cancel                                   │
+│                                                          │
+╰──────────────────────────────────────────────────────────╯
+╰──────────────────────────────────────────────────────────╯
+  enter send  alt+enter new line  pgup scroll  ^K commands

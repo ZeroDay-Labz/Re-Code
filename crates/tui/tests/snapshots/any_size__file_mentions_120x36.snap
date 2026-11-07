@@ -1,0 +1,40 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ ◆ re-code api-server › The retry loop in auth.rs never backs off. Fix it and run the tests. ─────────────────── DEMO ╮
+│                                                                                                                      │
+│    The problem was on line 42: retry_delay returned a duration that was immediately discarded.                       │
+│                                                                                                                      │
+│     rust                                                                                                             │
+│     for attempt in 0..MAX_RETRIES {                                                                                  │
+│         match send(&request).await {                                                                                 │
+│             Ok(response) => return Ok(response),                                                                     │
+│             Err(error) if error.is_transient() => {                                                                  │
+│                 tokio::time::sleep(retry_delay(attempt)).await;                                                      │
+│             }                                                                                                        │
+│             Err(error) => return Err(error),                                                                         │
+│         }                                                                                                            │
+│     }                                                                                                                │
+│                                                                                                                      │
+│    Attempt │ Delay  │ With jitter                                                                                    │
+│    ────────┼────────┼────────────                                                                                    │
+│    1       │ 200 ms │ 150–250 ms                                                                                     │
+│    2       │ 400 ms │ 300–500 ms                                                                                     │
+│    3       │ 800 ms │ 600–1000 ms                                                                                    │
+│                                                                                                                      │
+│    Things to check next:                                                                                             │
+╭ files ───────────────────────────────────────────────────────────────────╮                                           │
+│❯ src/module_0/a_rather_long_file_name_0.rs                               │                                           │
+│  src/module_1/a_rather_long_file_name_1.rs                               │                                           │
+│  src/module_2/a_rather_long_file_name_2.rs                               │                                           │
+│  src/module_3/a_rather_long_file_name_3.rs                               │                                           │
+│  src/module_4/a_rather_long_file_name_4.rs                               │reflow. 世界 and 🦀 are here to test       │
+│  src/module_5/a_rather_long_file_name_5.rs                               │                                           │
+│  src/module_6/a_rather_long_file_name_6.rs                               │                                           │
+│  src/module_7/a_rather_long_file_name_7.rs                               │                                           │
+╰──────────────────────────────────────────────── tab complete · esc close ╯───────────────────────────────────────────╯
+╭ ● Ready │ DEMO │ demo-model · recorded │ ctx ~6.0k/32k │ 100 tok/s │ tasks 1/3 ──────────────────────────────────────╮
+│ ❯  look at @mod                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                  enter send  alt+enter new line  pgup scroll  ^K commands  ^B panel  F1 keys  ^C quit

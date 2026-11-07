@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ ◆ re-code api-server › The retry loop in auth.r… ── DEMO ╮
+││ ↪send_with_retry(request: &Request) ->                 ││
+││ ↪Result<Response> {                                    ││
+││      for attempt in 0..MAX_RETRIES {                   ││
+││          match send(request).await {                   ││
+││              Ok(response) => return Ok(response),      ││
+││              Err(error) if error.is_transient() => {   ││
+││ -                let _delay = retry_delay(attempt);    ││
+││ +                                                      ││
+││ ↪tokio::time::sleep(retry_delay(attempt)).await;       ││
+││              }                                         ││
+││              Err(error) => return Err(error),          ││
+││          }                                             ││
+│╰────────────────────────────────────────────────────────╯│
+╰──────────────────────────────────────────────────────────╯
+╭ ▲ Needs approval │ DEMO │ ctx ~4.6k/32k │ tasks 1/3 ─────╮
+│ ▲ edit src/auth.rs                             y/a/p/n/d │
+│ ❯  Waiting for your answer above                         │
+╰──────────────────────────────────────────────────────────╯
+  esc stop  enter queue  pgup scroll  ^K commands  ^B panel

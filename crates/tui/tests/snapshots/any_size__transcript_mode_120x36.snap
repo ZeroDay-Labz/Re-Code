@@ -1,0 +1,40 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ Transcript · line 1 of 44 · "retry": 1 of 2  (/ search · n/N · [ to scrollback · v editor · q closes) ───────────────╮
+│ ▌ The retry loop in auth.rs never backs off. Fix it and run the tests.                                               │
+│                                                                                                                      │
+│ ▸ The delay is computed but discarded, so every retry fires immediately. (2 lines)                                   │
+│                                                                                                                      │
+│ The delay is computed but never applied, so all retries fire at once. I'll read the loop first.                      │
+│                                                                                                                      │
+│ ✓ read  src/auth.rs                                                                                        214 lines │
+│ ✓ grep  retry_delay                                                                                        3 matches │
+│ ✓ edit  src/auth.rs                                                                                          +1 −1 ▸ │
+│ ✓ shell cargo test auth                                                                                   3 passed ▸ │
+│                                                                                                                      │
+│ Fixed                                                                                                                │
+│                                                                                                                      │
+│ The retry loop now waits between attempts, and the tests pass.                                                       │
+│                                                                                                                      │
+│ The problem was on line 42: retry_delay returned a duration that was immediately discarded.                          │
+│                                                                                                                      │
+│  rust                                                                                                                │
+│  for attempt in 0..MAX_RETRIES {                                                                                     │
+│      match send(&request).await {                                                                                    │
+│          Ok(response) => return Ok(response),                                                                        │
+│          Err(error) if error.is_transient() => {                                                                     │
+│              tokio::time::sleep(retry_delay(attempt)).await;                                                         │
+│          }                                                                                                           │
+│          Err(error) => return Err(error),                                                                            │
+│      }                                                                                                               │
+│  }                                                                                                                   │
+│                                                                                                                      │
+│ Attempt │ Delay  │ With jitter                                                                                       │
+│ ────────┼────────┼────────────                                                                                       │
+│ 1       │ 200 ms │ 150–250 ms                                                                                        │
+│ 2       │ 400 ms │ 300–500 ms                                                                                        │
+│ 3       │ 800 ms │ 600–1000 ms                                                                                       │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

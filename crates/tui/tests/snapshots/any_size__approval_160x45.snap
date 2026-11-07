@@ -1,0 +1,49 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ ◆ re-code api-server › The retry loop in auth.rs never backs off. Fix it and run the tests. ───────────────────────── DEMO ╮╭ Session ───────────── ^B files ╮
+│       ▌ The retry loop in auth.rs never backs off. Fix it and run the tests.                                               ││ Model                          │
+│                                                                                                                            ││ demo-model                     │
+│       ▸ The delay is computed but discarded, so every retry fires immediately. (2 lines)                                   ││ recorded                       │
+│                                                                                                                            ││                                │
+│       The delay is computed but never applied, so all retries fire at once. I'll read the loop first.                      ││ Context                        │
+│                                                                                                                            ││ ━━━●────────────────────────── │
+│       ✓ read  src/auth.rs                                                                                  214 lines       ││ ~4.6k/32k                      │
+│       ✓ grep  retry_delay                                                                                  3 matches       ││                                │
+│       ╭ edit src/auth.rs ────────────────────────────────────────────────────────────────────────── needs approval ╮       ││ Tasks                          │
+│       │ Apply this change to src/auth.rs                                                                           │       ││ ☑ Read the retry loop          │
+│       │                                                                                                            │       ││ ◐ Apply the delay              │
+│       │ @@ -39,7 +39,7 @@ pub async fn send_with_retry(request: &Request) -> Result<Response> {                    │       ││ ☐ Run the tests                │
+│       │      for attempt in 0..MAX_RETRIES {                                                                       │       ││                                │
+│       │          match send(request).await {                                                                       │       ││ Files changed                  │
+│       │              Ok(response) => return Ok(response),                                                          │       ││ None                           │
+│       │              Err(error) if error.is_transient() => {                                                       │       ││                                │
+│       │ -                let _delay = retry_delay(attempt);                                                        │       ││ Tools run                      │
+│       │ +                tokio::time::sleep(retry_delay(attempt)).await;                                           │       ││ 3                              │
+│       │              }                                                                                             │       ││                                │
+│       │              Err(error) => return Err(error),                                                              │       ││                                │
+│       │          }                                                                                                 │       ││                                │
+│       ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────╯       ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+│                                                                                                                            ││                                │
+╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯╰────────────────────────────────╯
+╭ ▲ Needs approval │ DEMO │ demo-model · recorded │ ctx ~4.6k/32k ─────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ▲ edit src/auth.rs                                                              y approve  a always edit in this project  p for this project  n deny  d diff │
+│ ❯  Waiting for your answer above                                                                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                           esc stop  enter queue  pgup scroll  ^K commands  ^B panel  F1 keys  ^C quit
