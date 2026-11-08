@@ -480,6 +480,7 @@ impl From<WireToolCall> for ToolCall {
             id: call.id.unwrap_or_else(|| format!("call_{}", uuid::Uuid::now_v7().simple())),
             name: call.function.name,
             arguments,
+            extra: None,
         }
     }
 }
@@ -505,7 +506,7 @@ mod tests {
 
     #[test]
     fn body_encodes_tools_and_a_full_tool_exchange() {
-        let call = ToolCall { id: "c1".into(), name: "read".into(), arguments: json!({"path": "a"}) };
+        let call = ToolCall { id: "c1".into(), name: "read".into(), arguments: json!({"path": "a"}), extra: None };
         let mut assistant = Message::assistant("", vec![call.clone()]);
         assistant.reasoning = Some("private reasoning".into());
         let request = ChatRequest {

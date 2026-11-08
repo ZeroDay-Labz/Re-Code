@@ -222,11 +222,16 @@ fn request_body(request: &ChatRequest) -> Value {
                     .tool_calls
                     .iter()
                     .map(|call| {
-                        json!({
+                        let mut wire_call = json!({
                             "id": call.id,
                             "type": "function",
                             "function": {"name": call.name, "arguments": call.arguments.to_string()}
-                        })
+                        });
+                        // Gemini's thought signature (and anything else a provider attached) goes back as it came.
+                        if let Some(extra) = &call.extra {
+                            wire_call["extra_content"] = extra.clone();
+                        }
+                        wire_call
                     })
                     .collect::<Vec<_>>()
                     .into();
@@ -316,6 +321,7 @@ struct ToolAcc {
     id: String,
     name: String,
     arguments: String,
+    extra: Option<Value>,
 }
 
 impl ToolAcc {
@@ -323,7 +329,7 @@ impl ToolAcc {
         // The arguments come as a JSON string; if that doesn't parse, pass it on for validation.
         let arguments = serde_json::from_str(&self.arguments).unwrap_or(Value::String(self.arguments.clone()));
         let id = if self.id.is_empty() { format!("call_{}", uuid::Uuid::now_v7().simple()) } else { self.id };
-        ToolCall { id, name: self.name, arguments }
+        ToolCall { id, name: self.name, arguments, extra: self.extra }
     }
 }
 
@@ -335,6 +341,9 @@ fn merge_tool_fragment(tools: &mut Vec<ToolAcc>, fragment: DeltaToolCall) {
     let acc = &mut tools[index];
     if let Some(id) = fragment.id {
         acc.id = id;
+    }
+    if let Some(extra) = fragment.extra_content {
+        acc.extra = Some(extra);
     }
     if let Some(function) = fragment.function {
         if let Some(name) = function.name {
@@ -380,6 +389,8 @@ struct DeltaToolCall {
     index: Option<usize>,
     id: Option<String>,
     function: Option<DeltaFunction>,
+    /// Gemini: `{"google": {"thought_signature": "…"}}`, required back on the round trip.
+    extra_content: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -496,7 +507,7 @@ mod tests {
 
     #[test]
     fn the_body_sends_tool_schemas_and_round_trips_a_tool_exchange() {
-        let call = ToolCall { id: "c1".into(), name: "read".into(), arguments: json!({"path": "a"}) };
+        let call = ToolCall { id: "c1".into(), name: "read".into(), arguments: json!({"path": "a"}), extra: None };
         let request = ChatRequest {
             model: "m".into(),
             messages: vec![Message::assistant("", vec![call.clone()]), Message::tool_result(&call, "contents")],

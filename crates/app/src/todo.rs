@@ -91,13 +91,14 @@ mod tests {
                 {"text": "", "status": "pending"},
                 {"text": "Run tests"}
             ]}),
+            extra: None,
         };
         let items = parse(&call).unwrap();
         assert_eq!(items.len(), 3, "blank items are dropped");
         assert_eq!(items[1], TodoItem { text: "Fix the bug".into(), status: TodoStatus::InProgress });
         assert_eq!(items[2].status, TodoStatus::Pending, "no status means pending");
         assert_eq!(describe(&items), "[x] Read the code\n[~] Fix the bug\n[ ] Run tests");
-        let bad = ToolCall { id: "2".into(), name: TOOL.into(), arguments: json!({"tasks": []}) };
+        let bad = ToolCall { id: "2".into(), name: TOOL.into(), arguments: json!({"tasks": []}), extra: None };
         assert!(parse(&bad).unwrap_err().contains("items"));
     }
 }

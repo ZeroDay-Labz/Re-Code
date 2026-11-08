@@ -2165,6 +2165,7 @@ async fn drive(
                     id: format!("user-shell-{user_shell_count}"),
                     name: "shell".to_owned(),
                     arguments: json!({"command": command, "network": network}),
+                    extra: None,
                 };
                 let record = recorder.clone();
                 let sink = events.clone();
@@ -4915,7 +4916,7 @@ mod tests {
     }
 
     fn call(name: &str, arguments: serde_json::Value) -> ToolCall {
-        ToolCall { id: "1".to_owned(), name: name.to_owned(), arguments }
+        ToolCall { id: "1".to_owned(), name: name.to_owned(), arguments, extra: None }
     }
 
     /// Asks as the agent loop does, and says "always" when it's offered.
@@ -5065,13 +5066,19 @@ mod tests {
             id: "1".to_owned(),
             name: CALL_MCP_TOOL.to_owned(),
             arguments: json!({"server": "rea", "tool": "open_binary", "arguments": {"path": "/bin/ls"}}),
+            extra: None,
         };
         let text = describe_mcp_call(&call);
         assert!(text.contains("open_binary"), "{text}");
         assert!(text.contains("rea"), "{text}");
         assert!(text.contains("/bin/ls"), "{text}");
 
-        let direct = ToolCall { id: "2".to_owned(), name: "mcp__rea__close_binary".to_owned(), arguments: json!({}) };
+        let direct = ToolCall {
+            id: "2".to_owned(),
+            name: "mcp__rea__close_binary".to_owned(),
+            arguments: json!({}),
+            extra: None,
+        };
         assert!(describe_mcp_call(&direct).contains("close_binary"));
     }
 
@@ -5187,6 +5194,7 @@ mod tests {
                 id: format!("c{step}"),
                 name: "read".to_owned(),
                 arguments: json!({"path": format!("src/file{step}.rs")}),
+                extra: None,
             };
             chat.messages.push(Message::assistant("", vec![call.clone()]));
             chat.messages.push(Message::tool_result(&call, format!("content of file {step}\n{}", "x".repeat(size))));
@@ -5207,8 +5215,12 @@ mod tests {
         let file: String = (1..=3000).map(|n| format!("fn line_{n}() {{}}\n")).collect();
         chat.messages.push(Message::user("review my code"));
         for step in 0..4 {
-            let call =
-                ToolCall { id: format!("c{step}"), name: "read".into(), arguments: json!({"path": "src/app.rs"}) };
+            let call = ToolCall {
+                id: format!("c{step}"),
+                name: "read".into(),
+                arguments: json!({"path": "src/app.rs"}),
+                extra: None,
+            };
             chat.messages.push(Message::assistant("", vec![call.clone()]));
             chat.messages.push(Message::tool_result(&call, file.clone()));
         }
@@ -5227,6 +5239,7 @@ mod tests {
             id: "x".into(),
             name: compact::READ_RESULT.into(),
             arguments: json!({"handle": handle, "offset": offset}),
+            extra: None,
         };
         let first = chat.read_result(&call(1));
         assert!(first.starts_with("fn line_1() {}") && first.chars().count() <= cap, "{}", &first[..80]);
@@ -5261,7 +5274,12 @@ mod tests {
         assert!(after_tokens < before_tokens / 2);
         // read_result is offered only once something was shortened, and brings the original back.
         assert!(chat.offered_tools(&tool_definitions()).iter().any(|t| t.name == compact::READ_RESULT));
-        let call = ToolCall { id: "x".into(), name: compact::READ_RESULT.into(), arguments: json!({"handle": "r1"}) };
+        let call = ToolCall {
+            id: "x".into(),
+            name: compact::READ_RESULT.into(),
+            arguments: json!({"handle": "r1"}),
+            extra: None,
+        };
         assert!(chat.read_result(&call).starts_with("content of file 0\n"));
         // The shortened history is what gets saved, so read_result still works after a restart.
         assert_eq!(chat.saved().elided.len(), 14);
@@ -5474,9 +5492,11 @@ mod tests {
                 permissions.mode = PermissionMode::Plan;
             }
             // A save asks first; this user said "always" earlier in the session.
-            let save = ToolCall { id: "c".into(), name: "memory".into(), arguments: json!({"action": "save"}) };
+            let save =
+                ToolCall { id: "c".into(), name: "memory".into(), arguments: json!({"action": "save"}), extra: None };
             assert!(matches!(reach(&save, &workspace, &HashMap::new()), Reach::Ask { grant: Some(_), .. }));
-            let read = ToolCall { id: "c".into(), name: "memory".into(), arguments: json!({"action": "read"}) };
+            let read =
+                ToolCall { id: "c".into(), name: "memory".into(), arguments: json!({"action": "read"}), extra: None };
             assert_eq!(reach(&read, &workspace, &HashMap::new()), Reach::Free);
             permissions.allow(Grant::Exact("memory:write".into()));
             let (_tx, mut rx) = mpsc::unbounded_channel();
@@ -5850,6 +5870,7 @@ data: [DONE]\n\n";
             id: "1".to_owned(),
             name: "shell".to_owned(),
             arguments: json!({"command": "cargo fetch", "network": network}),
+            extra: None,
         };
         let none = HashMap::new();
         let (offline, _) = describe_tool(&call(false), &workspace, &reach(&call(false), &workspace, &none));

@@ -5,6 +5,28 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-08
+
+### Added
+
+- A crash writes a file next to the logs (`~/.local/state/re-code/crash-<ms>.txt`) with the message, the
+  place in the code, the version and the system, and nothing from the conversation; its path is named
+  once the terminal is restored. `re-code doctor --report` writes a bug-report bundle: the doctor report,
+  the version, recent log lines with secrets hidden, and any crash files.
+- `--version` names the commit and the build date. Logs rotate daily and keep a week.
+- GitHub Actions: the gate (fmt, clippy, tests, licences) on every push, the rpm built on Fedora 44 and the
+  deb built on Ubuntu 22.04 (glibc 2.35, so it installs on Debian 12 and Ubuntu 22.04 or newer); a `v*` tag
+  builds both and publishes the release with checksums and the changelog section as notes.
+- A live cloud test (`crates/providers/tests/live_cloud.rs`, ignored; key from the environment) that chats,
+  calls a tool and sends the result back on any OpenAI-compatible host or on Anthropic.
+
+### Fixed
+
+- Tool calls carry provider data back: Gemini's OpenAI-compatible endpoint attaches a `thought_signature`
+  to each tool call and refuses the next request without it, which broke every tool round trip on Gemini.
+  The adapter now keeps the signature with the call and returns it. **Verified live on Gemini 3.8 Flash**
+  (chat, tool call, round trip); the first live confirmation of tool calling on a cloud provider.
+
 ## [0.1.2] - 2026-11-08
 
 ### Added

@@ -560,7 +560,7 @@ mod tests {
     use recode_core::message::ToolCall;
 
     fn call(id: &str, command: &str) -> ToolCall {
-        ToolCall { id: id.to_owned(), name: "shell".to_owned(), arguments: json!({"command": command}) }
+        ToolCall { id: id.to_owned(), name: "shell".to_owned(), arguments: json!({"command": command}), extra: None }
     }
 
     /// One request followed by many tool steps, the usual way an agent turn grows.
@@ -651,6 +651,7 @@ mod tests {
             id: "c1".into(),
             name: "read".into(),
             arguments: json!({"path": "src/lib.rs"}),
+            extra: None,
         };
         messages.push(Message::assistant("", vec![call.clone()]));
         messages.push(Message::tool_result(&call, "x".repeat(900)));

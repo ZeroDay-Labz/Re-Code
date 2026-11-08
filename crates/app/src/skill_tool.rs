@@ -135,7 +135,7 @@ mod tests {
     }
 
     fn call(args: serde_json::Value) -> ToolCall {
-        ToolCall { id: "c1".to_owned(), name: TOOL.to_owned(), arguments: args }
+        ToolCall { id: "c1".to_owned(), name: TOOL.to_owned(), arguments: args, extra: None }
     }
 
     #[test]

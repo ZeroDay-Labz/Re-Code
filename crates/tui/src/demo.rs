@@ -85,7 +85,7 @@ fn todo(text: &str, status: TodoStatus) -> TodoItem {
 }
 
 fn tool(id: &str, name: &str, argument: &str, value: &str) -> ToolCall {
-    ToolCall { id: id.into(), name: name.into(), arguments: json!({ argument: value }) }
+    ToolCall { id: id.into(), name: name.into(), arguments: json!({ argument: value }), extra: None }
 }
 
 /// Splits text into small pieces, as a model's stream would.

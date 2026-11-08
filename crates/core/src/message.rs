@@ -19,6 +19,10 @@ pub struct ToolCall {
     pub id: String,
     pub name: String,
     pub arguments: Value,
+    /// Provider-specific data that has to travel back with the call, kept opaque. Gemini's
+    /// OpenAI-compatible endpoint puts a `thought_signature` here and refuses the round trip without it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra: Option<Value>,
 }
 
 /// An image attached to a message, held as base64 so it can be sent to any provider.

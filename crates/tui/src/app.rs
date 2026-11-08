@@ -4315,7 +4315,7 @@ mod tests {
         let mut app = app();
         let approval = ApprovalId::new();
         app.apply(EventKind::ToolCallRequested {
-            call: ToolCall { id: "c".into(), name: "edit".into(), arguments: json!({"path": "a.rs"}) },
+            call: ToolCall { id: "c".into(), name: "edit".into(), arguments: json!({"path": "a.rs"}), extra: None },
         });
         app.apply(EventKind::ApprovalRequired {
             approval,
@@ -4386,7 +4386,12 @@ mod tests {
     fn always_is_only_accepted_when_it_is_offered() {
         let mut app = app();
         app.apply(EventKind::ToolCallRequested {
-            call: ToolCall { id: "s".into(), name: "read".into(), arguments: json!({"path": "~/.ssh/id_ed25519"}) },
+            call: ToolCall {
+                id: "s".into(),
+                name: "read".into(),
+                arguments: json!({"path": "~/.ssh/id_ed25519"}),
+                extra: None,
+            },
         });
         let approval = ApprovalId::new();
         app.apply(EventKind::ApprovalRequired {
@@ -4921,7 +4926,7 @@ mod tests {
     fn edit_turn(app: &mut App, id: &str, diff: &str) {
         app.apply(EventKind::TurnStarted { turn: TurnId::new(), text: "change it".into() });
         app.apply(EventKind::ToolCallRequested {
-            call: ToolCall { id: id.into(), name: "edit".into(), arguments: json!({"path": "a.rs"}) },
+            call: ToolCall { id: id.into(), name: "edit".into(), arguments: json!({"path": "a.rs"}), extra: None },
         });
         let approval = ApprovalId::new();
         app.apply(EventKind::ApprovalRequired {

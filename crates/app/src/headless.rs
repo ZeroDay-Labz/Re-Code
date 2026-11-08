@@ -276,7 +276,12 @@ mod tests {
         let mut collector = Collector::default();
         let turn = TurnId::new();
         collector.take(&EventKind::TurnStarted { turn, text: "fix it".into() });
-        let call = ToolCall { id: "c1".into(), name: "shell".into(), arguments: json!({"command": "cargo test"}) };
+        let call = ToolCall {
+            id: "c1".into(),
+            name: "shell".into(),
+            arguments: json!({"command": "cargo test"}),
+            extra: None,
+        };
         collector.take(&EventKind::ToolCallRequested { call });
         let approval = ApprovalId::new();
         let asked = collector.take(&EventKind::ApprovalRequired {

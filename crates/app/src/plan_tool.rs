@@ -55,7 +55,8 @@ mod tests {
     fn the_plan_is_written_and_replaced() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("plans/abc.md");
-        let call = |text: &str| ToolCall { id: "c".into(), name: TOOL.into(), arguments: json!({"text": text}) };
+        let call =
+            |text: &str| ToolCall { id: "c".into(), name: TOOL.into(), arguments: json!({"text": text}), extra: None };
         let (text, ok) = run(&path, &call("# Goal\n1. a\n2. b"));
         assert!(ok && text.contains("3 lines"), "{text}");
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "# Goal\n1. a\n2. b\n");

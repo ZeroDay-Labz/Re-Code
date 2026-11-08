@@ -409,7 +409,7 @@ mod tests {
     use super::*;
 
     fn call(arguments: serde_json::Value) -> ToolCall {
-        ToolCall { id: "c".into(), name: TOOL.into(), arguments }
+        ToolCall { id: "c".into(), name: TOOL.into(), arguments, extra: None }
     }
 
     fn places(dir: &Path) -> Places {

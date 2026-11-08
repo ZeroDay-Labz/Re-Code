@@ -272,7 +272,7 @@ mod tests {
     use super::*;
 
     fn call(name: &str, id: &str) -> ToolCall {
-        ToolCall { id: "c".into(), name: name.into(), arguments: json!({"id": id}) }
+        ToolCall { id: "c".into(), name: name.into(), arguments: json!({"id": id}), extra: None }
     }
 
     #[test]

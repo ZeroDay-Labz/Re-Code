@@ -51,7 +51,7 @@ Packages for Fedora and Debian/Ubuntu are on the [releases page](https://github.
 
 ```sh
 sudo dnf install ./re-code-*.x86_64.rpm     # Fedora
-sudo apt install ./re-code_*_amd64.deb      # Debian, Ubuntu (needs glibc 2.39 or newer)
+sudo apt install ./re-code_*_amd64.deb      # Debian 12, Ubuntu 22.04 or newer
 ```
 
 Or build from source with a current stable Rust toolchain:
@@ -357,7 +357,7 @@ The design documents go deeper: [ARCHITECTURE](docs/ARCHITECTURE.md), [AGENT_ENG
 
 ## Status
 
-re-code is young and says so. **Verified live on local Ollama models:** the agent loop, approvals, the sandbox, undo and rewind, sessions, compaction, MCP against real servers (including stdio servers under bubblewrap), skill and plugin installs against the real hubs, and the OpenCode import against a real configuration. **Wired and unit-tested but not yet verified against a live provider:** tool calling on the cloud adapters. The `.deb` is built on Fedora and needs a recent glibc; a Debian-built package comes with CI. Not supported yet: cloning skills from git hosts other than GitHub, NVIDIA-specific hardware detection, llama.cpp as a chat route. The roadmap and what each milestone proved are in [ROADMAP](docs/ROADMAP.md); everything shipped is in [CHANGELOG](CHANGELOG.md).
+re-code is young and says so. **Verified live on local Ollama models:** the agent loop, approvals, the sandbox, undo and rewind, sessions, compaction, MCP against real servers (including stdio servers under bubblewrap), skill and plugin installs against the real hubs, and the OpenCode import against a real configuration. **Verified live on a cloud provider:** chat, a tool call and the round trip on Gemini through the OpenAI-compatible adapter (which found and fixed a missing thought-signature echo). The native Anthropic adapter is unit-tested only until a key is spent on it. The `.deb` is built on Ubuntu 22.04 by CI, so it installs on Debian 12 and Ubuntu 22.04 or newer. Not supported yet: cloning skills from git hosts other than GitHub, NVIDIA-specific hardware detection, llama.cpp as a chat route. The roadmap and what each milestone proved are in [ROADMAP](docs/ROADMAP.md); everything shipped is in [CHANGELOG](CHANGELOG.md).
 
 ## Development
 

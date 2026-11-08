@@ -250,7 +250,7 @@ mod tests {
             EventKind::StateChanged { state: AgentState::RunningTool { name: "read".into() } },
             EventKind::StateChanged { state: AgentState::Stalled { silent_for_secs: 90 } },
             EventKind::ToolCallRequested {
-                call: ToolCall { id: "c".into(), name: "read".into(), arguments: json!({"path": "a"}) },
+                call: ToolCall { id: "c".into(), name: "read".into(), arguments: json!({"path": "a"}), extra: None },
             },
             EventKind::UsageReported { usage: ReportedUsage { prompt_tokens: Some(1), ..ReportedUsage::default() } },
             EventKind::TurnFinished { turn: TurnId::new(), outcome: TurnOutcome::Failed { reason: "x".into() } },

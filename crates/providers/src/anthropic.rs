@@ -293,7 +293,7 @@ impl ToolAcc {
             serde_json::from_str(&self.arguments).unwrap_or(Value::String(self.arguments.clone()))
         };
         let id = if self.id.is_empty() { format!("call_{}", uuid::Uuid::now_v7().simple()) } else { self.id };
-        ToolCall { id, name: self.name, arguments }
+        ToolCall { id, name: self.name, arguments, extra: None }
     }
 }
 
@@ -503,7 +503,7 @@ mod tests {
 
     #[test]
     fn the_body_sends_tool_schemas_and_round_trips_tool_use_and_result() {
-        let call = ToolCall { id: "tu_1".into(), name: "read".into(), arguments: json!({"path": "a"}) };
+        let call = ToolCall { id: "tu_1".into(), name: "read".into(), arguments: json!({"path": "a"}), extra: None };
         let request = ChatRequest {
             model: "claude".into(),
             messages: vec![

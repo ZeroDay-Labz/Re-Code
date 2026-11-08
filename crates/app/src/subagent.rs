@@ -98,10 +98,12 @@ mod tests {
             id: "c".into(),
             name: TOOL.into(),
             arguments: json!({"description": "look", "prompt": "find x"}),
+            extra: None,
         };
         let (description, prompt, tools) = arguments(&call).unwrap();
         assert_eq!((description.as_str(), prompt.as_str(), tools), ("look", "find x", None));
-        let empty = ToolCall { id: "c".into(), name: TOOL.into(), arguments: json!({"description": "look"}) };
+        let empty =
+            ToolCall { id: "c".into(), name: TOOL.into(), arguments: json!({"description": "look"}), extra: None };
         assert!(arguments(&empty).is_err());
         assert!(cap_result(&"x".repeat(9000)).ends_with("characters]"));
     }
