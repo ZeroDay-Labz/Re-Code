@@ -2002,7 +2002,7 @@ fn installing_a_skill_shows_the_preview_and_takes_the_decision() {
     app.handle_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE));
     let actions = app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
     assert!(
-        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::CommitInstall { staging, enable: true })] if staging.ends_with("/godmode")),
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::CommitInstall { staging, enable: true, accept: false })] if staging.ends_with("/godmode")),
         "{actions:?}"
     );
     assert!(app.overlay.is_none());
@@ -2010,14 +2010,71 @@ fn installing_a_skill_shows_the_preview_and_takes_the_decision() {
     // Dangerous: y does nothing, k keeps it off, n discards.
     let mut app = install_preview("dangerous");
     let text = screen(&draw(&mut app, 120, 36));
-    assert!(text.contains("dangerous") && text.contains("Keep it, off?") && !text.contains("y yes"), "{text}");
+    assert!(
+        text.contains("dangerous")
+            && text.contains("Keep it, off?")
+            && text.contains("o enable on my word")
+            && !text.contains("y yes"),
+        "{text}"
+    );
     assert!(app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)).is_empty());
     assert!(app.overlay.is_some());
     let actions = app.handle_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE));
     assert!(
-        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::CommitInstall { enable: false, .. })]),
+        matches!(
+            actions.as_slice(),
+            [Action::Extension(ExtensionCommand::CommitInstall { enable: false, accept: false, .. })]
+        ),
         "{actions:?}"
     );
+
+    // Dangerous, accepted: o shows every finding and what accepting means; n goes back; y installs it on
+    // with the acceptance recorded.
+    let mut app = install_preview("dangerous");
+    assert!(app.handle_key(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE)).is_empty());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(
+        text.contains("Accept the findings of godmode")
+            && text.contains("scripts/setup.sh:3")
+            && text.contains("tied to exactly these findings")
+            && text.contains("y yes, I read them"),
+        "{text}"
+    );
+    assert!(app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE)).is_empty());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("Keep it, off?"), "{text}");
+    app.handle_key(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE));
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::CommitInstall { enable: true, accept: true, staging })] if staging.ends_with("/godmode")),
+        "{actions:?}"
+    );
+    assert!(app.overlay.is_none());
+
+    // On the Skills tab, space on a dangerous skill asks for the acceptance instead of refusing; y
+    // records it. An accepted one shows as such.
+    let mut app = home_on(HomeTab::Skills, flagged_skills());
+    let index = flagged_skills().skills.iter().position(|s| s.name == "helpful-cleanup").unwrap();
+    for _ in 0..index {
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    }
+    assert!(app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)).is_empty());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("Enable helpful-cleanup on your word?") && text.contains("dangerous pattern"), "{text}");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::AcceptScan(name))] if name == "helpful-cleanup"),
+        "{actions:?}"
+    );
+    let mut accepted = flagged_skills();
+    if let Some(skill) = accepted.skills.iter_mut().find(|s| s.name == "helpful-cleanup") {
+        skill.accepted = true;
+        skill.enabled = true;
+    }
+    let mut app = home_on(HomeTab::Skills, accepted);
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("▲ ● helpful-cleanup") || text.contains("▲ helpful-cleanup"), "{text}");
+    assert!(text.contains("dangerous, accepted"), "{text}");
     let mut app = install_preview("clean");
     let actions = app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE));
     assert!(matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::DiscardInstall(_))]), "{actions:?}");
@@ -2224,18 +2281,16 @@ fn flagged_skills_are_marked_and_trust_asks_before_enabling_project_skills() {
     let text = screen(&draw(&mut app, 120, 36));
     assert!(text.contains("⚠ helpful-cleanup") && text.contains("yours · dangerous"), "{text}");
     assert!(text.contains("project · caution"), "{text}");
-    // A dangerous skill can't be switched on.
+    // A dangerous skill isn't switched on by space alone: its findings are shown and the acceptance asked.
     for _ in 0..4 {
         app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
     }
     let text = screen(&draw(&mut app, 120, 36));
     assert!(text.contains("Scan: dangerous"), "{text}");
     assert!(app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE)).is_empty());
-    assert!(
-        app.home_message.as_ref().is_some_and(|(m, _)| m.contains("flagged as dangerous")),
-        "{:?}",
-        app.home_message
-    );
+    assert!(matches!(app.overlay, Some(recode_tui::app::Overlay::Confirm(_))), "{:?}", app.overlay.is_some());
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE));
+    assert!(app.overlay.is_none());
     // Switching on a project skill means trusting the folder. Before the driver has reported what the
     // folder holds, that's a wait; afterwards it shows exactly what would load and asks.
     for _ in 0..3 {

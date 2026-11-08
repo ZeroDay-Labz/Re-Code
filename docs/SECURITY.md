@@ -150,9 +150,14 @@ stay off until the user trusts the folder. Switching one on, or `/trust`, shows 
 `.re-code/` tree's content, so any change asks again. Symbolic links under `.re-code/` are never followed.
 Every skill, from any source, is also scanned before it can be enabled (`crates/extensions/src/scan.rs`):
 piped-to-shell downloads, decode-and-execute, destructive deletes, credential reads, exfiltration of
-environment variables, prompt-injection phrases and invisible characters. A `dangerous` verdict can't be
-enabled at all; `caution` is shown with its findings and can be. The scanner is a filter for the obvious,
-not a proof of safety, and the interface says so.
+environment variables, prompt-injection phrases and invisible characters. A `dangerous` verdict is never
+enabled by a plain yes, in the interface or by `--yes`; `caution` is shown with its findings and can be.
+Since 0.1.7 a dangerous verdict can be accepted knowingly: the scan can't tell a CVE write-up that quotes
+`rm -rf /` from instructions to run it, so the interface lists every finding, says what enabling means, and
+asks (`o` on the preview, `space` on the Skills tab, `--accept-dangerous` from the shell). The acceptance
+is recorded in `extensions.toml` as a fingerprint of exactly those findings (`accepted_scans`), so an
+update that changes them switches the skill off again until the user looks anew. The scanner is a filter
+for the obvious, not a proof of safety, and the interface says so.
 
 **Installing skills from hubs (implemented 2026-11-08, `crates/extensions/src/{fetch,skillhub}.rs`):**
 nothing fetched is ever executed. There is no `git clone` and no tarball: GitHub's tree listing names the
@@ -160,7 +165,8 @@ files and the raw endpoint serves them, so only regular files are written (0644,
 script executable), symbolic links and submodules are skipped and reported as a caution, a path that
 leaves the folder is refused, and the folder is capped at 5 MB, 400 files and 2 MB per file. Files land in
 a staging folder under the cache, are read and scanned there, and move into the skills folder only when
-the user decides; a `dangerous` verdict can only be kept off. Every install is pinned to a commit and the
+the user decides; a `dangerous` verdict is kept off unless its findings are accepted as above. Every
+install is pinned to a commit and the
 pin is recorded in the skill's `.re-code-source.toml`, so an update shows exactly which files change. A
 `GITHUB_TOKEN` in the environment is sent to the GitHub API only and never stored; skills.sh's API answers
 anonymous requests with 401, so its links are served from the repository they point at and the window says

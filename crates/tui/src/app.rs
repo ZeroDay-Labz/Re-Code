@@ -3254,13 +3254,37 @@ impl App {
                 }
             }
             HomeTab::Skills => match extensions.skills.get(index) {
-                Some(skill) if skill.scan.blocks() => {
-                    let text = format!(
-                        "{} was flagged as dangerous by the scan, so it can't be enabled: {}",
-                        skill.name,
-                        skill.scan.findings().first().map(|f| f.reason.as_str()).unwrap_or_default()
+                Some(skill) if skill.scan.blocks() && !skill.accepted && !skill.enabled => {
+                    // Enabling a dangerous skill means accepting its findings: show them and ask.
+                    let findings = skill.scan.findings();
+                    let mut body = vec![format!(
+                        "The scan found {} dangerous pattern{} in {}. They may be documentation about attacks rather than instructions to carry them out; the scan can't tell, and you can.",
+                        findings.len(),
+                        if findings.len() == 1 { "" } else { "s" },
+                        skill.name
+                    )];
+                    for finding in findings.iter().take(6) {
+                        let place = if finding.line > 0 {
+                            format!("{}:{}", finding.file, finding.line)
+                        } else {
+                            finding.file.clone()
+                        };
+                        let excerpt =
+                            if finding.excerpt.is_empty() { String::new() } else { format!(" ({})", finding.excerpt) };
+                        body.push(format!("{place}  {}{excerpt}", finding.reason));
+                    }
+                    if findings.len() > 6 {
+                        body.push(format!("…and {} more; Enter on the skill lists them all.", findings.len() - 6));
+                    }
+                    body.push(
+                        "If you enable it, the model reads these as instructions it may act on, with the sandbox and approvals as usual. The acceptance is tied to exactly these findings: an update that changes them switches it off again."
+                            .to_owned(),
                     );
-                    self.home_message = Some((text, true));
+                    self.overlay = Some(Overlay::Confirm(ConfirmState {
+                        title: format!("Enable {} on your word?", skill.name),
+                        body,
+                        command: Confirmed::Extension(ExtensionCommand::AcceptScan(skill.name.clone())),
+                    }));
                     None
                 }
                 Some(skill) if skill.source == SkillSource::Project && !skill.trusted => {

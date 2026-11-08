@@ -495,6 +495,25 @@ impl Verdict {
             Self::Dangerous { .. } => "dangerous",
         }
     }
+
+    /// A stable fingerprint of exactly these findings (FNV-1a over file, line, reason and excerpt), so an
+    /// acceptance of a dangerous verdict lapses as soon as the findings change. Empty when clean.
+    #[must_use]
+    pub fn fingerprint(&self) -> String {
+        let findings = self.findings();
+        if findings.is_empty() {
+            return String::new();
+        }
+        let mut lines: Vec<String> =
+            findings.iter().map(|f| format!("{}\u{0}{}\u{0}{}\u{0}{}", f.file, f.line, f.reason, f.excerpt)).collect();
+        lines.sort();
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for byte in lines.join("\n").bytes() {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        format!("{}:{hash:016x}", findings.len())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -542,6 +561,9 @@ pub struct Skill {
     pub allowed_tools: Vec<String>,
     #[serde(default)]
     pub scan: Verdict,
+    /// The scan calls it dangerous, and the user accepted exactly these findings, so it may be enabled.
+    #[serde(default)]
+    pub accepted: bool,
     /// For project skills: whether the folder's configuration has been trusted.
     #[serde(default)]
     pub trusted: bool,
@@ -1019,9 +1041,14 @@ pub enum ExtensionCommand {
     CommitInstall {
         staging: String,
         enable: bool,
+        /// The user read a dangerous verdict's findings and accepts them: enable it anyway. The
+        /// acceptance is tied to exactly those findings.
+        accept: bool,
     },
     /// Remove a staged skill.
     DiscardInstall(String),
+    /// Accept an installed skill's dangerous findings as they stand now, and switch it on.
+    AcceptScan(String),
     /// Stage the newest version of an installed skill, showing what would change.
     UpdateSkill(String),
     /// Browse the Hermes skills index: a source to stay within (`official`, `github`, `clawhub`, …, or

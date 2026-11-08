@@ -12,7 +12,7 @@ use recode_core::extensions::{
     SkillSearchHit, SkillSource, validate_name,
 };
 use serde::Deserialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -198,8 +198,10 @@ pub struct Committed {
     pub name: String,
     pub enabled: bool,
     pub location: String,
-    /// Why it's off although enabling was asked, when that happened.
+    /// Why it's off although enabling was asked, or that it's on by the user's acceptance.
     pub note: Option<String>,
+    /// The fingerprint of the dangerous findings the user accepted, to record with the skill.
+    pub accepted: Option<String>,
 }
 
 /// A hub search's answer.
@@ -708,7 +710,7 @@ impl Hub {
             let _ = std::fs::remove_dir_all(id);
             error
         };
-        let first = skills::read_skill(&dest, SkillSource::User, &BTreeSet::new(), false)
+        let first = skills::read_skill(&dest, SkillSource::User, &BTreeSet::new(), &BTreeMap::new(), false)
             .ok_or_else(|| fail("The files have no SKILL.md at the skill's root.".to_owned()))?;
         validate_name("skill", &first.name)
             .map_err(|error| fail(format!("Its name can't be a folder name: {error}")))?;
@@ -723,7 +725,7 @@ impl Hub {
         }
         let staged = id.join(&first.name);
         std::fs::rename(&dest, &staged).map_err(|error| fail(format!("couldn't rename the staged folder: {error}")))?;
-        let skill = skills::read_skill(&staged, SkillSource::User, &BTreeSet::new(), false)
+        let skill = skills::read_skill(&staged, SkillSource::User, &BTreeSet::new(), &BTreeMap::new(), false)
             .ok_or_else(|| fail("The staged skill vanished.".to_owned()))?;
 
         let target = self.skills_dir.join(&skill.name);
@@ -780,15 +782,24 @@ impl Hub {
     }
 
     /// Moves a staged skill into the skills folder. A dangerous verdict keeps it off whatever was asked.
-    pub fn commit(&self, staging: &str, enable: bool) -> Result<Committed, String> {
+    pub fn commit(&self, staging: &str, enable: bool, accept: bool) -> Result<Committed, String> {
         let staged = self.staged_path(staging)?;
         let name = staged.file_name().and_then(|n| n.to_str()).unwrap_or_default().to_owned();
         validate_name("skill", &name)?;
         let scan = scan::scan_dir(&staged);
-        let (enabled, note) = if enable && scan.blocks() {
-            (false, Some("The scan found something dangerous, so it stays off.".to_owned()))
+        let (enabled, note, accepted) = if enable && scan.blocks() && accept {
+            (
+                true,
+                Some(format!(
+                    "On by your acceptance of the {} dangerous findings; it goes off again if they change.",
+                    scan.findings().len()
+                )),
+                Some(scan.fingerprint()),
+            )
+        } else if enable && scan.blocks() {
+            (false, Some("The scan found something dangerous, so it stays off.".to_owned()), None)
         } else {
-            (enable, None)
+            (enable, None, None)
         };
         let target = self.skills_dir.join(&name);
         if target.exists() {
@@ -812,7 +823,7 @@ impl Hub {
         if let Some(parent) = staged.parent() {
             let _ = std::fs::remove_dir_all(parent);
         }
-        Ok(Committed { name, enabled, location: target.display().to_string(), note })
+        Ok(Committed { name, enabled, location: target.display().to_string(), note, accepted })
     }
 
     /// Removes a staged skill.

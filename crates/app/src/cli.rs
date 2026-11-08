@@ -131,6 +131,9 @@ pub enum SkillAction {
     },
     Enable {
         name: String,
+        /// Accept the dangerous findings the scan reports, as they stand now, and switch it on.
+        #[arg(long)]
+        accept_dangerous: bool,
     },
     Disable {
         name: String,
@@ -225,6 +228,10 @@ pub struct Decide {
     /// Install but leave it off.
     #[arg(long)]
     pub keep_off: bool,
+    /// With --yes: enable it although the scan calls it dangerous. You accept exactly the findings
+    /// shown; it goes off again if a later version changes them.
+    #[arg(long, requires = "yes")]
+    pub accept_dangerous: bool,
 }
 
 /// Everything the subcommands need, opened once.
@@ -507,10 +514,33 @@ async fn skill(session: &mut Session, action: SkillAction) -> Result<i32, String
             println!("Removed {name}.");
             Ok(OK)
         }
-        SkillAction::Enable { name } => {
-            session.extensions.set_skill_enabled(&name, true).map_err(|error| error.to_string())?;
-            println!("{name} is on.");
-            Ok(OK)
+        SkillAction::Enable { name, accept_dangerous } => {
+            let skill = session.extensions.snapshot().skills.into_iter().find(|skill| skill.name == name);
+            match skill {
+                Some(skill) if skill.scan.blocks() && !skill.accepted => {
+                    if !accept_dangerous {
+                        eprintln!(
+                            "{name} is flagged as dangerous by the scan ({} findings; `re-code skill list --json` shows them). To enable it anyway, accept them: re-code skill enable {name} --accept-dangerous",
+                            skill.scan.findings().len()
+                        );
+                        return Ok(REFUSED);
+                    }
+                    session
+                        .extensions
+                        .accept_scan(&name, &skill.scan.fingerprint())
+                        .map_err(|error| error.to_string())?;
+                    println!(
+                        "{name} is on by your acceptance of its {} dangerous findings; it goes off again if they change.",
+                        skill.scan.findings().len()
+                    );
+                    Ok(OK)
+                }
+                _ => {
+                    session.extensions.set_skill_enabled(&name, true).map_err(|error| error.to_string())?;
+                    println!("{name} is on.");
+                    Ok(OK)
+                }
+            }
         }
         SkillAction::Disable { name } => {
             session.extensions.set_skill_enabled(&name, false).map_err(|error| error.to_string())?;
@@ -577,13 +607,14 @@ fn finish_skill(
             println!("Location  {}", preview.location);
             let dangerous = preview.scan.blocks();
             match decision(decide, dangerous)? {
-                Choice::Enable | Choice::KeepOff => {
-                    let enable = matches!(decision(decide, dangerous)?, Choice::Enable);
-                    let committed = hub.commit(&preview.staging, enable)?;
-                    session
-                        .extensions
-                        .set_skill_enabled(&committed.name, committed.enabled)
-                        .map_err(|e| e.to_string())?;
+                choice @ (Choice::Enable | Choice::Accept | Choice::KeepOff) => {
+                    let enable = !matches!(choice, Choice::KeepOff);
+                    let committed = hub.commit(&preview.staging, enable, matches!(choice, Choice::Accept))?;
+                    match &committed.accepted {
+                        Some(fingerprint) => session.extensions.accept_scan(&committed.name, fingerprint),
+                        None => session.extensions.set_skill_enabled(&committed.name, committed.enabled),
+                    }
+                    .map_err(|e| e.to_string())?;
                     println!(
                         "Installed {} ({}).{}",
                         committed.name,
@@ -786,8 +817,10 @@ fn finish_plugin(
                 .parts
                 .iter()
                 .any(|part| matches!(part, recode_core::extensions::PluginPart::Skill { scan, .. } if scan.blocks()));
+            // A plugin's dangerous skill is accepted afterwards, skill by skill, never with the plugin.
+            let decide = Decide { accept_dangerous: false, ..decide };
             match decision(decide, dangerous)? {
-                Choice::Enable | Choice::KeepOff => {
+                Choice::Enable | Choice::Accept | Choice::KeepOff => {
                     let enable = matches!(decision(decide, dangerous)?, Choice::Enable);
                     let committed = hub.commit(&preview.staging, enable)?;
                     session
@@ -936,13 +969,19 @@ fn resolve_project(session: &Session, path: Option<PathBuf>) -> Result<PathBuf, 
 
 enum Choice {
     Enable,
+    /// Enable although the scan calls it dangerous: the user accepts the findings shown.
+    Accept,
     KeepOff,
     Discard,
     NoTerminal,
 }
 
-/// What to do with a staged install: the flags decide, else the terminal is asked.
+/// What to do with a staged install: the flags decide, else the terminal is asked. A dangerous verdict
+/// is never enabled by `--yes` alone; it takes `--accept-dangerous`, or typing `accept` at the prompt.
 fn decision(decide: Decide, dangerous: bool) -> Result<Choice, String> {
+    if decide.yes && dangerous && decide.accept_dangerous {
+        return Ok(Choice::Accept);
+    }
     if decide.keep_off || (decide.yes && dangerous) {
         return Ok(Choice::KeepOff);
     }
@@ -952,9 +991,15 @@ fn decision(decide: Decide, dangerous: bool) -> Result<Choice, String> {
     if !std::io::stdin().is_terminal() {
         return Ok(Choice::NoTerminal);
     }
-    let prompt =
-        if dangerous { "Keep it, off? [k]eep off / [n]o: " } else { "Enable now? [y]es / [k]eep off / [n]o: " };
+    let prompt = if dangerous {
+        "Keep it, off? [k]eep off / [n]o / type accept to enable it on your word: "
+    } else {
+        "Enable now? [y]es / [k]eep off / [n]o: "
+    };
     let answer = ask(prompt)?;
+    if dangerous && answer == "accept" {
+        return Ok(Choice::Accept);
+    }
     Ok(match answer.chars().next() {
         Some('y') if !dangerous => Choice::Enable,
         Some('k') => Choice::KeepOff,
@@ -978,7 +1023,7 @@ fn print_verdict(verdict: &Verdict) {
     match verdict {
         Verdict::Clean => println!("scan: clean"),
         other => {
-            let level = if other.blocks() { "dangerous (it can't be enabled)" } else { "caution" };
+            let level = if other.blocks() { "dangerous (off unless you accept the findings)" } else { "caution" };
             for (index, finding) in other.findings().iter().enumerate() {
                 let place =
                     if finding.line > 0 { format!("{}:{}", finding.file, finding.line) } else { finding.file.clone() };

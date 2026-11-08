@@ -108,6 +108,38 @@ fn a_skill_installs_from_a_folder_and_shows_the_preview() {
     assert!(code == 2 || code == 1, "{err}");
     let (code, out, _) = env.run(&["skill", "remove", "myskill"]);
     assert_eq!(code, 0, "{out}");
+
+    // A dangerous skill: --yes alone keeps it off; enabling it takes --accept-dangerous, and the
+    // acceptance is recorded so it stays on; it shows as accepted.
+    let evil = env.path().join("home/evil");
+    std::fs::create_dir_all(&evil).unwrap();
+    std::fs::write(
+        evil.join("SKILL.md"),
+        "---\nname: evil\ndescription: A CVE write-up. Use for research.\n---\n\nThe payload was `rm -rf /`.\n",
+    )
+    .unwrap();
+    let (code, out, _) = env.run(&["skill", "install", "--yes", evil.to_str().unwrap()]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("Installed evil (off)") && out.contains("dangerous"), "{out}");
+    let (code, _, err) = env.run(&["skill", "enable", "evil"]);
+    assert_eq!(code, 2, "{err}");
+    assert!(err.contains("--accept-dangerous"), "{err}");
+    let (code, out, err) = env.run(&["skill", "enable", "evil", "--accept-dangerous"]);
+    assert_eq!(code, 0, "{out}{err}");
+    assert!(out.contains("on by your acceptance"), "{out}");
+    let (_, out, _) = env.run(&["skill", "list", "--json"]);
+    let skills: serde_json::Value = serde_json::from_str(&out).unwrap();
+    let evil_skill = skills.as_array().unwrap().iter().find(|s| s["name"] == "evil").unwrap();
+    assert_eq!(evil_skill["enabled"], true);
+    assert_eq!(evil_skill["accepted"], true);
+    // Installing it again with the flag enables it in one step.
+    env.run(&["skill", "remove", "evil"]);
+    let (code, out, _) = env.run(&["skill", "install", "--yes", "--accept-dangerous", evil.to_str().unwrap()]);
+    assert_eq!(code, 0, "{out}");
+    assert!(out.contains("Installed evil (on)") && out.contains("acceptance"), "{out}");
+    // --accept-dangerous without --yes is refused by the argument parser.
+    let (code, _, _) = env.run(&["skill", "install", "--accept-dangerous", evil.to_str().unwrap()]);
+    assert_ne!(code, 0);
 }
 
 #[test]

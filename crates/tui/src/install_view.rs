@@ -129,6 +129,8 @@ pub enum InstallPhase {
         items: Vec<BatchItem>,
         selected: usize,
     },
+    /// A dangerous verdict's findings, read, and the question whether to enable it anyway.
+    AcceptDangerous(Box<InstallPreview>),
     UpToDate {
         name: String,
         sha: String,
@@ -686,17 +688,28 @@ impl App {
                     }
                     KeyCode::Char('y') | KeyCode::Enter if !dangerous => {
                         self.overlay = None;
-                        return vec![Action::Extension(ExtensionCommand::CommitInstall { staging, enable: true })];
+                        return vec![Action::Extension(ExtensionCommand::CommitInstall {
+                            staging,
+                            enable: true,
+                            accept: false,
+                        })];
                     }
                     KeyCode::Char('y') | KeyCode::Enter => {
                         self.toast(
-                            "The scan found something dangerous, so it can only be kept off.",
+                            "The scan found something dangerous: k keeps it off, or o reads the findings and enables it on your word.",
                             ToastLevel::Warning,
                         );
                     }
+                    KeyCode::Char('o') if dangerous => {
+                        state.phase = InstallPhase::AcceptDangerous(preview.clone());
+                    }
                     KeyCode::Char('k') => {
                         self.overlay = None;
-                        return vec![Action::Extension(ExtensionCommand::CommitInstall { staging, enable: false })];
+                        return vec![Action::Extension(ExtensionCommand::CommitInstall {
+                            staging,
+                            enable: false,
+                            accept: false,
+                        })];
                     }
                     KeyCode::Char('n') | KeyCode::Esc => {
                         self.overlay = None;
@@ -705,6 +718,22 @@ impl App {
                     _ => {}
                 }
             }
+            InstallPhase::AcceptDangerous(preview) => match key.code {
+                KeyCode::Char('y') => {
+                    let staging = preview.staging.clone();
+                    self.overlay = None;
+                    return vec![Action::Extension(ExtensionCommand::CommitInstall {
+                        staging,
+                        enable: true,
+                        accept: true,
+                    })];
+                }
+                KeyCode::Char('n') | KeyCode::Esc | KeyCode::Char('k') => {
+                    let preview = preview.clone();
+                    state.phase = InstallPhase::Preview { preview, reading: None };
+                }
+                _ => {}
+            },
             InstallPhase::Choose { candidates, selected, checked, .. } => match key.code {
                 KeyCode::Esc => self.overlay = None,
                 KeyCode::Up => *selected = selected.saturating_sub(1),
@@ -936,6 +965,7 @@ pub fn draw_install(frame: &mut Frame<'_>, area: Rect, state: &InstallState) {
         InstallPhase::PluginPreview(preview) => draw_plugin_preview(frame, area, preview),
         InstallPhase::Preview { preview, reading: Some(offset) } => draw_reading(frame, area, preview, *offset),
         InstallPhase::Preview { preview, reading: None } => draw_preview(frame, area, preview),
+        InstallPhase::AcceptDangerous(preview) => draw_accept_dangerous(frame, area, preview),
         InstallPhase::Choose { candidates, note, selected, checked } => {
             draw_choose(frame, area, &state.tap, candidates, note.as_deref(), *selected, checked);
         }
@@ -1236,7 +1266,7 @@ fn draw_preview(frame: &mut Frame<'_>, area: Rect, preview: &InstallPreview) {
     if findings.is_empty() {
         lines.push(Line::styled("scan: clean", Style::new().fg(theme::color(Token::Success))));
     } else {
-        let level = if dangerous { "dangerous (it can't be enabled)" } else { "caution" };
+        let level = if dangerous { "dangerous (off unless you accept the findings)" } else { "caution" };
         for (index, finding) in findings.iter().take(4).enumerate() {
             let place =
                 if finding.line > 0 { format!("{}:{}", finding.file, finding.line) } else { finding.file.clone() };
@@ -1272,7 +1302,7 @@ fn draw_preview(frame: &mut Frame<'_>, area: Rect, preview: &InstallPreview) {
     let question = if dangerous { "Keep it, off?" } else { "Enable now?" };
     lines.push(Line::styled(question, Style::new().add_modifier(Modifier::BOLD)));
     let keys: &[(&str, &str)] = if dangerous {
-        &[("k", "keep off"), ("n", "discard"), ("r", "read SKILL.md")]
+        &[("k", "keep off"), ("o", "enable on my word"), ("n", "discard"), ("r", "read SKILL.md")]
     } else {
         &[("y", "yes"), ("k", "keep off"), ("n", "discard"), ("r", "read SKILL.md")]
     };
@@ -1282,6 +1312,58 @@ fn draw_preview(frame: &mut Frame<'_>, area: Rect, preview: &InstallPreview) {
     let wanted = u16::try_from(lines.len() + 2).unwrap_or(20).min(28);
     let rect = overlay_area(area, 84, wanted.max(8));
     boxed(frame, rect, &title, lines);
+}
+
+/// Every dangerous finding, then what accepting them means, then the question. The scan can't tell an
+/// exploit write-up from instructions to carry one out; the person reading can.
+fn draw_accept_dangerous(frame: &mut Frame<'_>, area: Rect, preview: &InstallPreview) {
+    let rect = overlay_area(area, 96, area.height.saturating_sub(2));
+    let inner = usize::from(rect.width).saturating_sub(4);
+    let findings = preview.scan.findings();
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    lines.extend(wrap_plain(
+        &format!(
+            "The scan found {} dangerous pattern{} in {}. They may be documentation about attacks (a CVE write-up that quotes rm -rf /) rather than instructions to carry them out; the scan can't tell, and you can.",
+            findings.len(),
+            if findings.len() == 1 { "" } else { "s" },
+            preview.name
+        ),
+        Style::new(),
+        inner,
+    ));
+    lines.push(Line::default());
+    let room = usize::from(rect.height).saturating_sub(12);
+    let shown = findings.len().min(room.max(3) / 2);
+    for finding in findings.iter().take(shown) {
+        let place = if finding.line > 0 { format!("{}:{}", finding.file, finding.line) } else { finding.file.clone() };
+        let width = place.chars().count();
+        lines.push(Line::from(vec![
+            Span::styled(truncate(&place, inner), Style::new().fg(theme::color(Token::Danger))),
+            Span::styled(format!("  {}", truncate(&finding.reason, inner.saturating_sub(width + 2))), Style::new()),
+        ]));
+        if !finding.excerpt.is_empty() {
+            lines.push(Line::styled(
+                format!("    {}", truncate(&finding.excerpt, inner.saturating_sub(4))),
+                theme::muted(),
+            ));
+        }
+    }
+    if findings.len() > shown {
+        lines.push(Line::styled(
+            format!("    …and {} more (r on the preview reads the file)", findings.len() - shown),
+            theme::muted(),
+        ));
+    }
+    lines.push(Line::default());
+    lines.extend(wrap_plain(
+        "If you enable it, the model reads every one of these as instructions it may act on, with the sandbox and approvals as usual. The acceptance is tied to exactly these findings: an update that changes them switches the skill off again until you look at it anew.",
+        theme::muted(),
+        inner,
+    ));
+    lines.push(Line::default());
+    lines.push(Line::styled("Enable it on your word?", Style::new().add_modifier(Modifier::BOLD)));
+    lines.push(legend(&[("y", "yes, I read them"), ("n", "back")], inner));
+    boxed(frame, rect, &format!("Accept the findings of {}", preview.name), lines);
 }
 
 /// `SKILL.md` as fetched, scrolling.

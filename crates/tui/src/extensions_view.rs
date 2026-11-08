@@ -82,6 +82,7 @@ fn skill_row(skill: &Skill) -> Row {
         SkillSource::Plugin => "plugin",
     };
     let (marker, marker_style) = match (&skill.problem, skill.scan.blocks(), skill.enabled) {
+        (_, true, true) => ("▲", Style::new().fg(color(Token::Attention))),
         (_, true, _) => ("⚠", Style::new().fg(color(Token::Danger))),
         (Some(_), _, _) => ("✗", Style::new().fg(color(Token::Danger))),
         (None, _, true) => ("●", Style::new().fg(color(Token::Success))),
@@ -93,6 +94,7 @@ fn skill_row(skill: &Skill) -> Row {
     };
     let right = match &skill.scan {
         recode_core::extensions::Verdict::Clean => source,
+        verdict if skill.accepted => format!("{source} · {}, accepted", verdict.label()),
         verdict => format!("{source} · {}", verdict.label()),
     };
     Row { marker, marker_style, name: skill.name.clone(), right, enabled: skill.enabled }
@@ -573,8 +575,10 @@ fn skill_details(skill: &Skill, width: usize) -> Vec<Line<'static>> {
     let findings = skill.scan.findings();
     if !findings.is_empty() {
         lines.push(Line::default());
-        let headline = if skill.scan.blocks() {
-            "Scan: dangerous. It can't be enabled."
+        let headline = if skill.scan.blocks() && skill.accepted {
+            "Scan: dangerous. You accepted these findings, so it's enabled on your word; it goes off again if they change."
+        } else if skill.scan.blocks() {
+            "Scan: dangerous. Space shows these findings and asks whether to enable it on your word."
         } else {
             "Scan: caution. Read these before enabling it."
         };

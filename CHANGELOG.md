@@ -5,6 +5,20 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-08
+
+### Added
+
+- A dangerous scan verdict can be accepted, knowingly. The scan can't tell a CVE write-up that quotes
+  `rm -rf /` from instructions to run it; the person reading can. `o` on a dangerous preview (or
+  `space` on a dangerous skill in the Skills tab) lists every finding, says what enabling means, and
+  asks; `y` installs or switches it on by your word. The acceptance is recorded against a fingerprint
+  of exactly those findings, so an update that changes them switches the skill off again until you look
+  anew. From the shell: `re-code skill install --yes --accept-dangerous <what>` and
+  `re-code skill enable <name> --accept-dangerous`; `--yes` alone still keeps a dangerous skill off. A
+  plugin's dangerous skill is accepted afterwards, skill by skill, never with the plugin. An accepted
+  skill shows `▲` and "dangerous, accepted" in the list.
+
 ## [0.1.6] - 2026-11-08
 
 ### Added

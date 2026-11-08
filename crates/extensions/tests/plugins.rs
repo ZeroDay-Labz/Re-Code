@@ -5,7 +5,7 @@ use recode_core::extensions::{PluginOutcome, PluginPart};
 use recode_extensions::fetch::{Bases, Fetcher};
 use recode_extensions::plugins::{HERMES_CATALOG, PluginHub, discover, read_plugin};
 use serde_json::json;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -266,7 +266,8 @@ async fn a_claude_code_marketplace_is_followed_browsed_and_installed_from() {
     assert_eq!(plugin.source.tap, "context7@claude-plugins-official");
     let servers = recode_extensions::plugins::servers_of(&installed, "context7");
     assert_eq!(servers[0].external.as_ref().unwrap().label, "plugin context7");
-    let skills = recode_extensions::plugins::skills_of(&installed, "context7", true, &BTreeSet::new());
+    let skills =
+        recode_extensions::plugins::skills_of(&installed, "context7", true, &BTreeSet::new(), &BTreeMap::new());
     assert_eq!(skills.len(), 1);
     assert_eq!(skills[0].name, "setup");
 
@@ -322,8 +323,13 @@ async fn a_local_marketplace_and_a_local_plugin_folder_work_offline() {
     // A dangerous skill inside keeps the whole plugin off when enabling is asked.
     let committed = hub.commit(&preview.staging, true).unwrap();
     assert!(!committed.enabled && committed.note.unwrap().contains("dangerous"));
-    let skills =
-        recode_extensions::plugins::skills_of(&dir.path().join("data/plugins/hello"), "hello", true, &BTreeSet::new());
+    let skills = recode_extensions::plugins::skills_of(
+        &dir.path().join("data/plugins/hello"),
+        "hello",
+        true,
+        &BTreeSet::new(),
+        &BTreeMap::new(),
+    );
     let evil = skills.iter().find(|s| s.name == "evil").unwrap();
     assert!(!evil.enabled && evil.scan.blocks());
     assert!(skills.iter().find(|s| s.name == "hello").unwrap().enabled);

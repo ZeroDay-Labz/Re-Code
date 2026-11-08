@@ -21,7 +21,7 @@ pub use probe::{Launch, probe, probe_with};
 use recode_core::extensions::{CustomTool, ExtensionsSnapshot, Marketplace, McpServer, ToolFilter, validate_name};
 use recode_core::providers::CloudProvider;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 fn set_flag(set: &mut BTreeSet<String>, name: &str, on: bool) {
@@ -59,6 +59,10 @@ struct FileContents {
     providers: Vec<CloudProvider>,
     #[serde(skip_serializing_if = "BTreeSet::is_empty")]
     disabled_skills: BTreeSet<String>,
+    /// Dangerous verdicts the user accepted: skill name → fingerprint of the findings accepted. The
+    /// skill may be enabled only while its findings still match.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    accepted_scans: BTreeMap<String, String>,
     /// Servers read from Claude Code that are switched off here.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     external_disabled: BTreeSet<String>,
@@ -205,6 +209,7 @@ impl Extensions {
             skills: skills::discover(
                 &self.locations,
                 &self.contents.disabled_skills,
+                &self.contents.accepted_scans,
                 self.project_trusted,
                 &self.contents.disabled_plugins,
             ),
@@ -368,10 +373,19 @@ impl Extensions {
     pub fn delete_skill(&mut self, name: &str) -> Result<(), ExtensionError> {
         validate_name("skill", name).map_err(ExtensionError::Invalid)?;
         skills::delete(&self.locations.user_skills, name)?;
-        if self.contents.disabled_skills.remove(name) {
+        let forgot = self.contents.disabled_skills.remove(name);
+        if self.contents.accepted_scans.remove(name).is_some() || forgot {
             self.save()?;
         }
         Ok(())
+    }
+
+    /// Records that the user accepted a dangerous verdict's findings (by fingerprint) and switches the
+    /// skill on. It stays on only while the findings match the fingerprint.
+    pub fn accept_scan(&mut self, name: &str, fingerprint: &str) -> Result<(), ExtensionError> {
+        self.contents.accepted_scans.insert(name.to_owned(), fingerprint.to_owned());
+        self.contents.disabled_skills.remove(name);
+        self.save()
     }
 
     pub fn set_skill_enabled(&mut self, name: &str, enabled: bool) -> Result<(), ExtensionError> {

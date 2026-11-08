@@ -14,7 +14,7 @@ use recode_core::extensions::{
     PluginPart, PluginPreview, Replacing, Skill, SkillSource, validate_name,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -72,11 +72,19 @@ pub fn read_plugin(dir: &Path, disabled: &BTreeSet<String>) -> Option<Plugin> {
 
 /// The skills an enabled plugin brings, for the skill index.
 #[must_use]
-pub fn skills_of(dir: &Path, plugin_name: &str, enabled: bool, disabled_skills: &BTreeSet<String>) -> Vec<Skill> {
+pub fn skills_of(
+    dir: &Path,
+    plugin_name: &str,
+    enabled: bool,
+    disabled_skills: &BTreeSet<String>,
+    accepted: &BTreeMap<String, String>,
+) -> Vec<Skill> {
     let mut found = Vec::new();
     if let Ok(entries) = std::fs::read_dir(dir.join("skills")) {
         for entry in entries.flatten() {
-            if let Some(mut skill) = skills::read_skill(&entry.path(), SkillSource::Plugin, disabled_skills, true) {
+            if let Some(mut skill) =
+                skills::read_skill(&entry.path(), SkillSource::Plugin, disabled_skills, accepted, true)
+            {
                 skill.plugin = Some(plugin_name.to_owned());
                 skill.enabled = skill.enabled && enabled;
                 found.push(skill);
@@ -87,7 +95,7 @@ pub fn skills_of(dir: &Path, plugin_name: &str, enabled: bool, disabled_skills: 
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("md")
-                && let Some(mut skill) = read_command(&path, disabled_skills)
+                && let Some(mut skill) = read_command(&path, disabled_skills, accepted)
             {
                 skill.plugin = Some(plugin_name.to_owned());
                 skill.enabled = skill.enabled && enabled;
@@ -101,7 +109,7 @@ pub fn skills_of(dir: &Path, plugin_name: &str, enabled: bool, disabled_skills: 
 
 /// A Claude Code command file (`commands/<name>.md`) as a skill: its front matter's description, and
 /// the body as the instructions.
-fn read_command(path: &Path, disabled: &BTreeSet<String>) -> Option<Skill> {
+fn read_command(path: &Path, disabled: &BTreeSet<String>, accepted: &BTreeMap<String, String>) -> Option<Skill> {
     let text = std::fs::read_to_string(path).ok()?;
     let stem = path.file_stem()?.to_string_lossy().to_lowercase().replace(['_', ' ', '.'], "-");
     let (front, body) = frontmatter::split(&text);
@@ -112,7 +120,8 @@ fn read_command(path: &Path, disabled: &BTreeSet<String>) -> Option<Skill> {
     let findings = scan::scan_text(path.file_name()?.to_str()?, &text);
     let verdict = scan::verdict(findings);
     let problem = validate_name("skill", &stem).err();
-    let enabled = problem.is_none() && !verdict.blocks() && !disabled.contains(&stem);
+    let accepted_now = verdict.blocks() && accepted.get(&stem) == Some(&verdict.fingerprint());
+    let enabled = problem.is_none() && (!verdict.blocks() || accepted_now) && !disabled.contains(&stem);
     Some(Skill {
         name: stem,
         description,
@@ -206,7 +215,7 @@ fn read_manifest(dir: &Path) -> Option<ManifestInfo> {
 #[must_use]
 pub fn parts_of(dir: &Path) -> Vec<PluginPart> {
     let mut parts = Vec::new();
-    for skill in skills_of(dir, "", true, &BTreeSet::new()) {
+    for skill in skills_of(dir, "", true, &BTreeSet::new(), &BTreeMap::new()) {
         let command = skill.path.ends_with(".md") && !skill.path.ends_with("SKILL.md");
         parts.push(PluginPart::Skill { name: skill.name, path: skill.path, scan: skill.scan, command });
     }
@@ -1468,14 +1477,14 @@ mod tests {
         );
         assert_eq!(plugin.header(), "frontend-design [local] · maintained by Anthropic");
 
-        let skills = skills_of(&root, "frontend-design", true, &BTreeSet::new());
+        let skills = skills_of(&root, "frontend-design", true, &BTreeSet::new(), &BTreeMap::new());
         assert_eq!(skills.len(), 2);
         assert!(
             skills.iter().all(|s| s.source == SkillSource::Plugin
                 && s.plugin.as_deref() == Some("frontend-design")
                 && s.enabled)
         );
-        let off = skills_of(&root, "frontend-design", false, &BTreeSet::new());
+        let off = skills_of(&root, "frontend-design", false, &BTreeSet::new(), &BTreeMap::new());
         assert!(off.iter().all(|s| !s.enabled));
         let servers = servers_of(&root, "frontend-design");
         assert_eq!(servers.len(), 2);

@@ -306,6 +306,7 @@ impl Manager {
             | ExtensionCommand::AddMcpFromLink { .. }
             | ExtensionCommand::StageSkill(_)
             | ExtensionCommand::CommitInstall { .. }
+            | ExtensionCommand::AcceptScan(_)
             | ExtensionCommand::DiscardInstall(_)
             | ExtensionCommand::UpdateSkill(_)
             | ExtensionCommand::BrowseSkills { .. }
@@ -1502,7 +1503,7 @@ async fn drive(
                 let mut done = Vec::new();
                 let mut failed = Vec::new();
                 for (staging, enable) in items {
-                    match skill_hub.as_deref().map(|hub| hub.commit(&staging, enable)) {
+                    match skill_hub.as_deref().map(|hub| hub.commit(&staging, enable, false)) {
                         Some(Ok(committed)) => {
                             let _ = manager.extensions.set_skill_enabled(&committed.name, committed.enabled);
                             done.push(format!("{} ({})", committed.name, if committed.enabled { "on" } else { "off" }));
@@ -1578,8 +1579,8 @@ async fn drive(
                     }
                 }
             }
-            UiCommand::Extension(ExtensionCommand::CommitInstall { staging, enable }) => {
-                let outcome = match skill_hub.as_deref().map(|hub| hub.commit(&staging, enable)) {
+            UiCommand::Extension(ExtensionCommand::CommitInstall { staging, enable, accept }) => {
+                let outcome = match skill_hub.as_deref().map(|hub| hub.commit(&staging, enable, accept)) {
                     Some(Ok(committed)) => {
                         let mut text = if committed.enabled {
                             format!("Installed {} and switched it on.", committed.name)
@@ -1590,13 +1591,39 @@ async fn drive(
                             text.push(' ');
                             text.push_str(note);
                         }
-                        if let Err(error) = manager.extensions.set_skill_enabled(&committed.name, committed.enabled) {
+                        let saved = match &committed.accepted {
+                            Some(fingerprint) => manager.extensions.accept_scan(&committed.name, fingerprint),
+                            None => manager.extensions.set_skill_enabled(&committed.name, committed.enabled),
+                        };
+                        if let Err(error) = saved {
                             text.push_str(&format!(" (Its on/off choice couldn't be saved: {error})"));
                         }
                         (text, false)
                     }
                     Some(Err(error)) => (error, true),
                     None => (HUB_UNAVAILABLE.to_owned(), true),
+                };
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text: outcome.0, is_error: outcome.1 });
+            }
+            UiCommand::Extension(ExtensionCommand::AcceptScan(name)) => {
+                let skill = manager.extensions.snapshot().skills.into_iter().find(|skill| skill.name == name);
+                let outcome = match skill {
+                    Some(skill) if skill.scan.blocks() => {
+                        match manager.extensions.accept_scan(&skill.name, &skill.scan.fingerprint()) {
+                            Ok(()) => (
+                                format!(
+                                    "{} is on by your acceptance of its {} dangerous findings; it goes off again if they change.",
+                                    skill.name,
+                                    skill.scan.findings().len()
+                                ),
+                                false,
+                            ),
+                            Err(error) => (format!("Couldn't record that: {error}"), true),
+                        }
+                    }
+                    Some(skill) => (format!("{} isn't flagged as dangerous; space switches it on.", skill.name), true),
+                    None => (format!("There's no skill called {name}."), true),
                 };
                 let _ = events.send(UiEvent::Extensions(manager.snapshot()));
                 let _ = events.send(UiEvent::HomeMessage { text: outcome.0, is_error: outcome.1 });

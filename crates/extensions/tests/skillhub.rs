@@ -111,7 +111,9 @@ async fn pasted_skill_text_is_staged_scanned_and_installed_but_never_updated() {
     assert_eq!(preview.files, ["SKILL.md"]);
     assert_eq!(preview.scan, Verdict::Clean);
     assert!(preview.note.as_deref().unwrap_or_default().contains("only the SKILL.md"));
-    let committed = hub.commit(&preview.staging, true).unwrap();
+    // Accepting a verdict that isn't dangerous records nothing.
+    let committed = hub.commit(&preview.staging, true, true).unwrap();
+    assert!(committed.accepted.is_none(), "{committed:?}");
     assert_eq!(committed.name, "pdf");
     assert!(dir.path().join("skills/pdf/SKILL.md").exists());
     assert_eq!(read_source(&dir.path().join("skills/pdf")).unwrap().label, "pasted");
@@ -178,7 +180,7 @@ async fn an_official_hermes_skill_is_pinned_fetched_scanned_and_installed() {
         assert_eq!(std::fs::metadata(staged.join("SKILL.md")).unwrap().permissions().mode() & 0o777, 0o644);
     }
 
-    let committed = hub.commit(&preview.staging, true).unwrap();
+    let committed = hub.commit(&preview.staging, true, false).unwrap();
     assert!(committed.enabled && committed.note.is_none());
     let installed = dir.path().join("skills/godmode");
     assert_eq!(files(&installed), [".re-code-source.toml", "SKILL.md", "scripts/run.py"]);
@@ -210,7 +212,7 @@ async fn an_official_hermes_skill_is_pinned_fetched_scanned_and_installed() {
     let replacing = update.replaces.clone().unwrap();
     assert_eq!(replacing.sha, SHA1);
     assert_eq!(replacing.changed, ["~ SKILL.md", "+ notes.md", "- scripts/run.py"]);
-    hub.commit(&update.staging, false).unwrap();
+    hub.commit(&update.staging, false, false).unwrap();
     assert_eq!(files(&installed), [".re-code-source.toml", "SKILL.md", "notes.md"]);
     assert_eq!(read_source(&installed).unwrap().sha, SHA2);
 }
@@ -357,10 +359,18 @@ async fn a_dangerous_skill_stays_off_even_when_enabling_is_asked() {
     let hub = mocks.hub(dir.path());
     let InstallOutcome::Preview(preview) = hub.stage("bad/actor").await else { panic!() };
     assert!(preview.scan.blocks());
-    let committed = hub.commit(&preview.staging, true).unwrap();
+    let committed = hub.commit(&preview.staging, true, false).unwrap();
     assert!(!committed.enabled);
     assert!(committed.note.unwrap().contains("dangerous"));
+    assert!(committed.accepted.is_none());
     assert!(dir.path().join("skills/evil/SKILL.md").is_file());
+
+    // Accepting the findings is the one way on; the fingerprint comes back to be recorded.
+    let InstallOutcome::Preview(preview) = hub.stage("bad/actor").await else { panic!() };
+    let committed = hub.commit(&preview.staging, true, true).unwrap();
+    assert!(committed.enabled);
+    assert_eq!(committed.accepted.as_deref(), Some(preview.scan.fingerprint().as_str()));
+    assert!(committed.note.unwrap().contains("acceptance"));
 }
 
 #[tokio::test]
@@ -479,7 +489,7 @@ async fn limits_traversal_and_rate_limits_are_plain_errors() {
     assert!(error.contains("60 an hour") && error.contains("resets"), "{error}");
     let InstallOutcome::Failed { error, .. } = hub.stage("o/missing").await else { panic!() };
     assert!(error.contains("no o/missing"), "{error}");
-    assert!(hub.commit("/etc", true).is_err(), "only staged paths can be committed");
+    assert!(hub.commit("/etc", true, false).is_err(), "only staged paths can be committed");
     assert!(hub.discard(dir.path().to_str().unwrap()).is_err());
     // Nothing was left in staging.
     let staging = dir.path().join("cache/hub/staging");
@@ -502,7 +512,7 @@ async fn a_local_folder_is_copied_without_following_links_and_a_clash_is_refused
     assert_eq!(preview.source.label, "local");
     #[cfg(unix)]
     assert!(preview.scan.findings().iter().any(|f| f.file == "passwd"), "{:?}", preview.scan);
-    hub.commit(&preview.staging, true).unwrap();
+    hub.commit(&preview.staging, true, false).unwrap();
     // A hand-made skill of the same name is never replaced by an install.
     let hand_made = dir.path().join("skills/hand");
     std::fs::create_dir_all(&hand_made).unwrap();

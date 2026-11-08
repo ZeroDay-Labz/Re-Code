@@ -26,7 +26,7 @@ async fn live_official_hermes_skill_stages_and_installs() {
     assert_eq!(preview.name, "godmode");
     assert_eq!(preview.source.sha.len(), 40);
     assert!(preview.files.contains(&"SKILL.md".to_owned()));
-    let committed = hub.commit(&preview.staging, false).unwrap();
+    let committed = hub.commit(&preview.staging, false, false).unwrap();
     assert!(dir.path().join("skills/godmode/SKILL.md").is_file(), "{committed:?}");
     assert_eq!(
         hub.update("godmode").await,
