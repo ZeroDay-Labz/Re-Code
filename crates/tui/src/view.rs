@@ -972,6 +972,7 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Overlay::Form(form) => draw_form(frame, area, &form),
         Overlay::Confirm(confirm) => draw_confirm(frame, area, &confirm),
         Overlay::McpPresets { selected } => draw_mcp_presets(frame, area, selected),
+        Overlay::WebSetup { selected } => draw_web_setup(frame, area, selected),
         Overlay::McpSearch { query, hits, selected, searching, error } => {
             draw_mcp_search(frame, area, &query, &hits, selected, searching, error.as_deref());
         }
@@ -1299,6 +1300,47 @@ fn draw_mcp_presets(frame: &mut Frame<'_>, area: Rect, selected: usize) {
     lines.push(Line::default());
     lines.push(legend(&[("enter", "fill the form"), ("esc", "cancel")], inner));
     boxed(frame, rect, "MCP presets", lines);
+}
+
+/// `/web`: search servers the model can use, with what each needs. Enter fills the MCP form.
+fn draw_web_setup(frame: &mut Frame<'_>, area: Rect, selected: usize) {
+    use recode_core::extensions::WEB_SEARCH_PRESETS;
+    let rect = overlay_area(area, 84, u16::try_from(WEB_SEARCH_PRESETS.len() * 3 + 6).unwrap_or(24));
+    let inner = usize::from(rect.width).saturating_sub(4);
+    let mut lines = wrap_plain(
+        "Web search reaches the model as an MCP server. Pick one; the form opens with the command filled in, and your address or key stays in your own configuration.",
+        theme::muted(),
+        inner,
+    );
+    lines.push(Line::default());
+    let visible = (usize::from(rect.height).saturating_sub(lines.len() + 4) / 3).max(1);
+    let first =
+        selected.saturating_sub(visible.saturating_sub(1)).min(WEB_SEARCH_PRESETS.len().saturating_sub(visible));
+    for (index, preset) in WEB_SEARCH_PRESETS.iter().enumerate().skip(first).take(visible) {
+        let base = if index == selected {
+            Style::new().bg(theme::color(Token::UserBg)).add_modifier(Modifier::BOLD)
+        } else {
+            Style::new()
+        };
+        let keyless = preset.settings.is_empty() || !preset.settings.contains("KEY");
+        lines.push(Line::from(vec![
+            Span::styled(if index == selected { "❯ " } else { "  " }, theme::accent().patch(base)),
+            Span::styled(truncate(preset.name, inner.saturating_sub(14)), base),
+            Span::raw("  "),
+            crate::widgets::chip(
+                if keyless { "no key" } else { "key" },
+                if keyless { theme::color(Token::Success) } else { theme::color(Token::Attention) },
+            ),
+        ]));
+        lines.push(Line::styled(format!("    {}", truncate(preset.note, inner.saturating_sub(4))), theme::muted()));
+        lines.push(Line::styled(
+            format!("    needs: {}", truncate(preset.needs, inner.saturating_sub(11))),
+            theme::faint(),
+        ));
+    }
+    lines.push(Line::default());
+    lines.push(legend(&[("enter", "fill the form"), ("↑↓", "choose"), ("esc", "cancel")], inner));
+    boxed(frame, rect, "Web search for the model", lines);
 }
 
 fn draw_provider_presets(frame: &mut Frame<'_>, area: Rect, selected: usize) {

@@ -30,7 +30,9 @@ sudo apt install ./re-code_*.deb      # Debian, Ubuntu
 Or build from source with a current stable Rust toolchain: `cargo install --path crates/app`. `bubblewrap` is
 recommended (it sandboxes the commands the agent runs; `sudo dnf install bubblewrap`), and a running
 [Ollama](https://ollama.com) with a tool-capable model is the usual starting point. Run `re-code` in a project
-folder; `re-code doctor` explains what it found on the machine.
+folder; `re-code doctor` explains what it found on the machine. `/web` gives the model web search through an
+MCP server of your choice (your own SearXNG, DuckDuckGo, Brave, Tavily, Exa); `/skill install` and `/plugin
+install` bring in skills and plugins from the Hermes hubs, GitHub and Claude Code marketplaces.
 
 ## A look around
 

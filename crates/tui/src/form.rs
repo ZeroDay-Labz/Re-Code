@@ -190,7 +190,7 @@ impl FormState {
     /// A server form pre-filled from a preset.
     #[must_use]
     pub fn from_mcp_preset(preset: &McpPreset) -> Self {
-        Self::server_form("Add MCP server", None, preset.name, preset.connection, "", true)
+        Self::server_form("Add MCP server", None, preset.name, preset.connection, preset.settings, true)
     }
 
     fn server_form(

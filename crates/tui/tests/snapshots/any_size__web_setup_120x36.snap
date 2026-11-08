@@ -1,0 +1,40 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ ◆ re-code api-server ────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                 ╭ Web search for the model ────────────────────────────────────────────────────────╮                 │
+│                 │ Web search reaches the model as an MCP server. Pick one; the form opens with     │                 │
+│                 │ the command filled in, and your address or key stays in your own configuration.  │                 │
+│                 │                                                                                  │                 │
+│                 │ ❯ searxng   no key                                                               │                 │
+│                 │     Your own SearXNG instance: private, no key, any engines you've enabled ther… │                 │
+│                 │     needs: A running SearXNG (put its address in SEARXNG_URL) and Node.js        │                 │
+│                 │   duckduckgo   no key                                                            │                 │
+│                 │     DuckDuckGo results without an account.                                       │                 │
+│                 │     needs: uv (Python); no key                                                   │                 │
+│                 │   fetch   no key                                                                 │                 │
+│                 │     Reads a web page as text for the model, with a start index for long pages. … │                 │
+│                 │     needs: uv (Python); no key                                                   │                 │
+│                 │   brave-search   key                                                             │                 │
+│                 │     Brave's index: web, news, images; a free tier exists.                        │                 │
+│                 │     needs: A key from brave.com/search/api (free tier) and Node.js               │                 │
+│                 │   tavily   key                                                                   │                 │
+│                 │     Search tuned for agents, with extracted page content.                        │                 │
+│                 │     needs: A key from tavily.com (free tier) and Node.js                         │                 │
+│                 │                                                                                  │                 │
+│                 │ enter fill the form  ↑↓ choose  esc cancel                                       │                 │
+│                 │                                                                                  │                 │
+│                 │                                                                                  │                 │
+│                 ╰──────────────────────────────────────────────────────────────────────────────────╯                 │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭ ● Ready │ ask │ gpt-oss:20b ·  ──────────────────────────────────────────────────────────────────────────────────────╮
+│ ❯  Ask anything                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+enter send  alt+enter new line  pgup scroll  ^K commands  ^L model  ^E extensions  ⇧tab mode  ^B panel  F1 keys  ^C quit

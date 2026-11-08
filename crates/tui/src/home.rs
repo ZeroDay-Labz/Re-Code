@@ -19,6 +19,8 @@ pub enum DashItem {
     /// Start with this model.
     Model(String),
     GetFree,
+    /// Set up web search for the model (`/web`).
+    WebSearch,
     Theme,
     Settings,
 }
@@ -46,6 +48,7 @@ pub fn dashboard_rows(app: &App) -> Vec<DashItem> {
             }
         }
     }
+    rows.push(DashItem::WebSearch);
     rows.push(DashItem::Theme);
     rows.push(DashItem::Settings);
     rows
@@ -110,6 +113,9 @@ pub fn draw_home(frame: &mut Frame<'_>, area: Rect, app: &mut App, selected: usi
             }
             DashItem::GetFree => {
                 ("Start", row("★", color(Token::Success), "Get free models", "/free", index == selected, width))
+            }
+            DashItem::WebSearch => {
+                ("More", row("⌕", color(Token::Sky), "Give the model web search", "/web", index == selected, width))
             }
             DashItem::Theme => {
                 ("More", row("◆", color(Token::Violet), "Change theme", "/theme", index == selected, width))

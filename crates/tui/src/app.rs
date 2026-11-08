@@ -10,7 +10,9 @@ use crate::welcome::{HomeTab, WelcomeInfo, WelcomeModel, WelcomeState};
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::style::Color;
 use recode_core::context::{ContextWindow, Size, Trigger, WindowSetting};
-use recode_core::extensions::{ExtensionCommand, ExtensionsSnapshot, MCP_PRESETS, McpTransport, SkillSource};
+use recode_core::extensions::{
+    ExtensionCommand, ExtensionsSnapshot, MCP_PRESETS, McpTransport, SkillSource, WEB_SEARCH_PRESETS,
+};
 use recode_core::ids::ApprovalId;
 use recode_core::message::ImageData;
 use recode_core::message::ToolCall;
@@ -231,6 +233,10 @@ pub enum Overlay {
     McpPresets {
         selected: usize,
     },
+    /// `/web`: web search for the model, as an MCP server to set up.
+    WebSetup {
+        selected: usize,
+    },
     /// Searching the MCP registry: type, Enter searches, Enter on a hit adds it.
     McpSearch {
         query: String,
@@ -304,6 +310,7 @@ pub enum PaletteCommand {
     TrustProject,
     InstallSkill,
     InstallPlugin,
+    WebSearch,
     Help,
     Quit,
 }
@@ -326,6 +333,7 @@ pub const PALETTE: &[(PaletteCommand, &str, &str)] = &[
     (PaletteCommand::TrustProject, "Trust this folder's configuration (project skills)", "/trust"),
     (PaletteCommand::InstallSkill, "Install a skill from a hub (Hermes, GitHub, skills.sh)", "/skill install"),
     (PaletteCommand::InstallPlugin, "Install a plugin (Hermes catalog, Claude Code marketplaces)", "/plugin install"),
+    (PaletteCommand::WebSearch, "Give the model web search (SearXNG, DuckDuckGo, Brave…)", "/web"),
     (PaletteCommand::Help, "Keyboard shortcuts", "F1"),
     (PaletteCommand::Quit, "Quit", "Ctrl+C twice"),
 ];
@@ -1786,6 +1794,7 @@ impl App {
             "tools" => tab(self, HomeTab::Tools),
             "skills" => tab(self, HomeTab::Skills),
             "plugins" => tab(self, HomeTab::Plugins),
+            "web" | "search" => self.run_command(PaletteCommand::WebSearch),
             "plugin" => {
                 let mut words = argument.splitn(2, char::is_whitespace);
                 let verb = words.next().unwrap_or_default();
@@ -2119,6 +2128,7 @@ impl App {
                 Vec::new()
             }
             Some(DashItem::Theme) => self.run_command(PaletteCommand::Theme),
+            Some(DashItem::WebSearch) => self.run_command(PaletteCommand::WebSearch),
             Some(DashItem::Settings) => {
                 if let Screen::Welcome(welcome) = &mut self.screen {
                     welcome.tab = HomeTab::Settings;
@@ -2972,6 +2982,15 @@ impl App {
         }
     }
 
+    /// `/web`: offers web-search MCP servers to set up.
+    pub fn open_web_setup(&mut self) {
+        if self.demo {
+            self.toast("That isn't available in the demo recording.", ToastLevel::Info);
+            return;
+        }
+        self.overlay = Some(Overlay::WebSetup { selected: 0 });
+    }
+
     /// `/trust`: shows what the project folder's configuration would load, and asks.
     fn trust_project(&mut self) -> Vec<Action> {
         if self.demo {
@@ -3641,6 +3660,21 @@ impl App {
                 }
                 _ => {}
             },
+            Overlay::WebSetup { selected } => match key.code {
+                KeyCode::Esc => self.overlay = None,
+                KeyCode::Up => *selected = selected.saturating_sub(1),
+                KeyCode::Down => *selected = (*selected + 1).min(WEB_SEARCH_PRESETS.len().saturating_sub(1)),
+                KeyCode::Enter => {
+                    let preset = WEB_SEARCH_PRESETS.get((*selected).min(WEB_SEARCH_PRESETS.len().saturating_sub(1)));
+                    self.overlay = preset.map(|preset| Overlay::Form(FormState::from_mcp_preset(preset)));
+                    self.home_message = Some((
+                        "Fill in the address or key, Enter saves it, then t tests it. The model gets the server's search tools in its next turn."
+                            .to_owned(),
+                        false,
+                    ));
+                }
+                _ => {}
+            },
             Overlay::ProviderPresets { selected } => match key.code {
                 KeyCode::Esc => self.overlay = None,
                 KeyCode::Up => *selected = selected.saturating_sub(1),
@@ -4136,6 +4170,7 @@ impl App {
             PaletteCommand::TrustProject => return self.trust_project(),
             PaletteCommand::InstallSkill => return self.open_install(None),
             PaletteCommand::InstallPlugin => return self.open_plugin_install(None),
+            PaletteCommand::WebSearch => self.open_web_setup(),
             PaletteCommand::FreeModels => {
                 if self.demo {
                     self.toast("That isn't available in the demo recording.", ToastLevel::Info);

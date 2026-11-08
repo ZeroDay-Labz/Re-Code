@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+╭ Web search for the model ────────────────────────────────╮
+│ Web search reaches the model as an MCP server. Pick      │
+│ one; the form opens with the command filled in, and      │
+│ your address or key stays in your own configuration.     │
+│                                                          │
+│ ❯ searxng   no key                                       │
+│     Your own SearXNG instance: private, no key, any eng… │
+│     needs: A running SearXNG (put its address in SEARXN… │
+│   duckduckgo   no key                                    │
+│     DuckDuckGo results without an account.               │
+│     needs: uv (Python); no key                           │
+│   fetch   no key                                         │
+│     Reads a web page as text for the model, with a star… │
+│     needs: uv (Python); no key                           │
+│   brave-search   key                                     │
+│     Brave's index: web, news, images; a free tier exist… │
+│     needs: A key from brave.com/search/api (free tier) … │
+│                                                          │
+│ enter fill the form  ↑↓ choose  esc cancel               │
+╰──────────────────────────────────────────────────────────╯

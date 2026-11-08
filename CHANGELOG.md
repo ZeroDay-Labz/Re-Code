@@ -5,6 +5,10 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-08
+
+Adds `/web` to 0.1.0, which was tagged earlier the same day as the first packaged release (rpm and deb).
+
 ### Added
 
 - Runtime discovery: `re-code doctor` finds Ollama, llama.cpp, vLLM and LM Studio by what each answers,
@@ -32,6 +36,9 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
   discard / `r` read. Nothing fetched is executed, no git is run. `/skill update <name>` (or `u`) shows the
   files that would change, `/skill search <words>` searches the Hermes index. Each installed skill carries a
   `.re-code-source.toml` with where it came from and which commit.
+- `/web` (also on the Home tab) sets up web search for the model as an MCP server: your own SearXNG by
+  address, DuckDuckGo and a page reader without any key, or Brave, Tavily and Exa with a key. The pick
+  opens the MCP form prefilled; the address or key stays in your own configuration.
 - Saved chats can be deleted: `d` on a chat in the Home list or in the `/continue` picker asks, then removes
   its messages, snapshot and compaction history. Deleting the open conversation starts a new one.
 - Plugins: a Plugins tab and `/plugin install <what>` install from the Hermes plugin catalog (a name such as

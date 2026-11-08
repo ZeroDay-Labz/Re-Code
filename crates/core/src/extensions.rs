@@ -13,7 +13,11 @@ pub struct McpPreset {
     pub name: &'static str,
     /// The command or address placed into the add form.
     pub connection: &'static str,
+    /// Environment variables or headers placed into the add form (`KEY=value, OTHER=${VAR}`), to fill in.
+    pub settings: &'static str,
     pub note: &'static str,
+    /// What the user has to have or get first, in a few words; empty when nothing.
+    pub needs: &'static str,
 }
 
 /// Built-in MCP servers offered as one-click presets. `@latest` keeps them up to date.
@@ -21,12 +25,64 @@ pub const MCP_PRESETS: &[McpPreset] = &[
     McpPreset {
         name: "rea",
         connection: "npx -y rea-agents@latest mcp",
+        settings: "",
         note: "Reverse-engineer binaries, apps and firmware (github.com/morluto/rea).",
+        needs: "Node.js",
     },
     McpPreset {
         name: "context7",
         connection: "npx -y @upstash/context7-mcp@latest",
+        settings: "",
         note: "Up-to-date library documentation for the model.",
+        needs: "Node.js",
+    },
+];
+
+/// Web search and page reading for the model, as MCP servers: `/web` offers these. Package names and
+/// variables checked against npm and PyPI on 2026-11-08. The address or key is the user's own and goes
+/// into their `extensions.toml`, never into re-code.
+pub const WEB_SEARCH_PRESETS: &[McpPreset] = &[
+    McpPreset {
+        name: "searxng",
+        connection: "npx -y mcp-searxng@latest",
+        settings: "SEARXNG_URL=http://127.0.0.1:8080",
+        note: "Your own SearXNG instance: private, no key, any engines you've enabled there.",
+        needs: "A running SearXNG (put its address in SEARXNG_URL) and Node.js",
+    },
+    McpPreset {
+        name: "duckduckgo",
+        connection: "uvx duckduckgo-mcp-server",
+        settings: "",
+        note: "DuckDuckGo results without an account.",
+        needs: "uv (Python); no key",
+    },
+    McpPreset {
+        name: "fetch",
+        connection: "uvx mcp-server-fetch",
+        settings: "",
+        note: "Reads a web page as text for the model, with a start index for long pages. Pairs with any search.",
+        needs: "uv (Python); no key",
+    },
+    McpPreset {
+        name: "brave-search",
+        connection: "npx -y @brave/brave-search-mcp-server@latest",
+        settings: "BRAVE_API_KEY=${BRAVE_API_KEY}",
+        note: "Brave's index: web, news, images; a free tier exists.",
+        needs: "A key from brave.com/search/api (free tier) and Node.js",
+    },
+    McpPreset {
+        name: "tavily",
+        connection: "npx -y tavily-mcp@latest",
+        settings: "TAVILY_API_KEY=${TAVILY_API_KEY}",
+        note: "Search tuned for agents, with extracted page content.",
+        needs: "A key from tavily.com (free tier) and Node.js",
+    },
+    McpPreset {
+        name: "exa",
+        connection: "npx -y exa-mcp-server@latest",
+        settings: "EXA_API_KEY=${EXA_API_KEY}",
+        note: "Neural search and research over the web.",
+        needs: "A key from exa.ai and Node.js",
     },
 ];
 

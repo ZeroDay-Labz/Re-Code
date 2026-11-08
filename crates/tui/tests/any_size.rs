@@ -341,6 +341,38 @@ fn plugin_browse() -> App {
     app
 }
 
+/// `/web` with its picker open.
+fn web_setup() -> App {
+    let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
+    app.input.insert("/web");
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    app
+}
+
+#[test]
+fn web_search_setup_offers_servers_and_prefills_the_mcp_form() {
+    let mut app = web_setup();
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(
+        text.contains("Web search for the model") && text.contains("searxng") && text.contains("SearXNG"),
+        "{text}"
+    );
+    assert!(text.contains("duckduckgo") && text.contains("no key") && text.contains("brave-search"), "{text}");
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(
+        text.contains("Add MCP server")
+            && text.contains("npx -y mcp-searxng@latest")
+            && text.contains("SEARXNG_URL=http://127.0.0.1:8080"),
+        "{text}"
+    );
+    // Home tab row and palette entry lead to the same picker.
+    let mut app = home_on(HomeTab::Home, sample_extensions());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("Web search for the model") || text.contains("Give the model web search"), "{text}");
+}
+
 #[test]
 fn saved_chats_can_be_deleted_from_home_and_the_picker_after_a_confirmation() {
     use recode_tui::link::SessionSummary;
@@ -1098,6 +1130,7 @@ fn every_scene() -> Vec<(&'static str, App)> {
     scenes.push(("install choose", install_choose()));
     scenes.push(("skill search", skill_search()));
     scenes.push(("plugins tab", home_on(HomeTab::Plugins, sample_extensions())));
+    scenes.push(("web setup", web_setup()));
     scenes.push(("plugin preview", plugin_preview()));
     scenes.push(("plugin browse", plugin_browse()));
 
@@ -2320,6 +2353,7 @@ fn snapshots_at_typical_sizes() {
         snapshot("plugins_tab", &mut home_on(HomeTab::Plugins, sample_extensions()), width, height);
         snapshot("plugin_preview", &mut plugin_preview(), width, height);
         snapshot("plugin_browse", &mut plugin_browse(), width, height);
+        snapshot("web_setup", &mut web_setup(), width, height);
     }
 }
 
