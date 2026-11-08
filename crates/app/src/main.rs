@@ -5,6 +5,7 @@ mod chat;
 mod cli;
 mod compact;
 mod config;
+mod crash;
 mod doctor;
 mod headless;
 mod hooks;
@@ -28,8 +29,12 @@ use clap::{CommandFactory, Parser, Subcommand};
 use std::io::IsTerminal;
 use std::path::PathBuf;
 
+/// `0.1.2 (7f894dcadc, 2026-11-08)`: the version, the commit and the build date, for bug reports.
+const VERSION: &str =
+    concat!(env!("CARGO_PKG_VERSION"), " (", env!("RE_CODE_GIT_SHA"), ", ", env!("RE_CODE_BUILD_DATE"), ")");
+
 #[derive(Parser)]
-#[command(name = "re-code", version, about = "A terminal-native AI coding agent")]
+#[command(name = "re-code", version = VERSION, about = "A terminal-native AI coding agent")]
 struct Cli {
     /// Read configuration from this file instead of the default location.
     #[arg(long, global = true, value_name = "FILE")]
@@ -88,6 +93,10 @@ enum Command {
         /// Output JSON instead of text.
         #[arg(long)]
         json: bool,
+        /// Write a bundle for a bug report (this report, the version, recent log lines with secrets
+        /// hidden, and any crash files) and print its path.
+        #[arg(long)]
+        report: bool,
     },
     /// Try the terminal interface with a recorded session. No model is connected and no files change.
     Demo,
@@ -119,6 +128,7 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     let paths = paths::Paths::from_environment()?;
     let _log_guard = logging::init(&paths.log_dir)?;
+    crash::install_hook(&paths);
     tracing::info!(version = env!("CARGO_PKG_VERSION"), "starting");
     let config = config::Config::load(cli.config.as_deref().unwrap_or(&paths.config_file))?;
 
@@ -131,12 +141,18 @@ async fn main() -> Result<()> {
     }
 
     match cli.command {
-        Some(Command::Doctor { json }) => {
-            let report = doctor::gather(&paths, &ollama_url).await;
-            if json {
-                println!("{}", serde_json::to_string_pretty(&report)?);
+        Some(Command::Doctor { json, report }) => {
+            let gathered = doctor::gather(&paths, &ollama_url).await;
+            if report {
+                let path = crash::write_report(&paths, &serde_json::to_string_pretty(&gathered)?)?;
+                println!(
+                    "Wrote {}. Read it before sharing it: it names your runtimes, containers and models.",
+                    path.display()
+                );
+            } else if json {
+                println!("{}", serde_json::to_string_pretty(&gathered)?);
             } else {
-                print!("{}", doctor::render::render(&report, doctor::render::Style::detect()));
+                print!("{}", doctor::render::render(&gathered, doctor::render::Style::detect()));
             }
         }
         Some(Command::Demo) => recode_tui::run_demo().await?,

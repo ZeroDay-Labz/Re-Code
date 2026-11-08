@@ -22,7 +22,13 @@ pub fn init(log_dir: &Path) -> Result<WorkerGuard> {
         std::fs::set_permissions(log_dir, std::fs::Permissions::from_mode(0o700))
             .with_context(|| format!("cannot secure log directory {}", log_dir.display()))?;
     }
-    let appender = tracing_appender::rolling::daily(log_dir, "re-code.log");
+    // One file a day, a week kept: enough to look back at a problem, bounded on disk.
+    let appender = tracing_appender::rolling::Builder::new()
+        .rotation(tracing_appender::rolling::Rotation::DAILY)
+        .filename_prefix("re-code.log")
+        .max_log_files(7)
+        .build(log_dir)
+        .with_context(|| format!("cannot open the log in {}", log_dir.display()))?;
     let (writer, guard) = tracing_appender::non_blocking(appender);
     let filter = EnvFilter::try_from_env(FILTER_VARIABLE).unwrap_or_else(|_| EnvFilter::new("info"));
     tracing_subscriber::fmt().json().with_env_filter(filter).with_writer(writer).init();

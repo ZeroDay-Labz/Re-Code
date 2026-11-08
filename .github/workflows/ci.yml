@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  gate:
+    name: fmt, clippy, tests, licences
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install bubblewrap and git (the sandbox tests use them when present)
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap git
+      - uses: taiki-e/install-action@cargo-deny
+      - name: The gate
+        run: ./scripts/check.sh
+
+  rpm:
+    name: Fedora rpm (dry run)
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build tools
+        run: dnf install -y gcc rustup git rpm-build && rustup-init -y --profile minimal && echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-generate-rpm
+      - run: cargo build --release
+      - run: cargo generate-rpm -p crates/app -o dist/
+      - run: rpm -qpi dist/*.rpm && rpm -qpl dist/*.rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rpm
+          path: dist/*.rpm
+
+  deb:
+    name: Debian deb (built on an old glibc)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb
+      - run: cargo build --release
+      - run: cargo deb -p re-code --no-build -o dist/
+      - run: dpkg-deb --info dist/*.deb && dpkg-deb --contents dist/*.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: dist/*.deb
