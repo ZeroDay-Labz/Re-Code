@@ -96,6 +96,38 @@ fn walkdir(dir: &Path) -> Vec<std::path::PathBuf> {
 }
 
 #[tokio::test]
+async fn pasted_skill_text_is_staged_scanned_and_installed_but_never_updated() {
+    let mocks = Mocks::start().await;
+    let dir = tempfile::tempdir().unwrap();
+    let hub = mocks.hub(dir.path());
+    assert!(Hub::looks_like_skill_text(PDF));
+    assert!(!Hub::looks_like_skill_text("https://skills.sh/anthropics/skills/pdf"));
+    assert!(!Hub::looks_like_skill_text("official/security/godmode"));
+
+    let InstallOutcome::Preview(preview) = hub.stage_text(PDF) else { panic!() };
+    assert_eq!(preview.name, "pdf");
+    assert_eq!(preview.source.label, "pasted");
+    assert_eq!(preview.source.tap, "pasted");
+    assert_eq!(preview.files, ["SKILL.md"]);
+    assert_eq!(preview.scan, Verdict::Clean);
+    assert!(preview.note.as_deref().unwrap_or_default().contains("only the SKILL.md"));
+    let committed = hub.commit(&preview.staging, true).unwrap();
+    assert_eq!(committed.name, "pdf");
+    assert!(dir.path().join("skills/pdf/SKILL.md").exists());
+    assert_eq!(read_source(&dir.path().join("skills/pdf")).unwrap().label, "pasted");
+
+    // Dangerous text is staged with its verdict, like anything else; bad text is refused.
+    let InstallOutcome::Preview(preview) = hub.stage_text(EVIL) else { panic!() };
+    assert!(preview.scan.blocks());
+    hub.discard(&preview.staging).unwrap();
+    let InstallOutcome::Failed { error, .. } = hub.stage_text("just some words") else { panic!() };
+    assert!(error.contains("SKILL.md"), "{error}");
+
+    let InstallOutcome::Failed { error, .. } = hub.update("pdf").await else { panic!() };
+    assert!(error.contains("pasted"), "{error}");
+}
+
+#[tokio::test]
 async fn an_official_hermes_skill_is_pinned_fetched_scanned_and_installed() {
     let mocks = Mocks::start().await;
     let dir = tempfile::tempdir().unwrap();
@@ -262,6 +294,57 @@ async fn a_repository_with_several_skills_offers_a_choice_and_a_pinned_pick_inst
     let InstallOutcome::Preview(preview) = hub.stage(&candidates[0].tap).await else { panic!() };
     assert_eq!(preview.source.tap, "anthropics/skills/skills/pdf", "the pin is dropped so updates follow the branch");
     assert_eq!(preview.source.sha, SHA1);
+}
+
+#[tokio::test]
+async fn a_repository_that_is_itself_a_skill_and_too_large_offers_its_skill_folders() {
+    let mocks = Mocks::start().await;
+    let dir = tempfile::tempdir().unwrap();
+    mocks.commit("conor", "avoid", "HEAD", SHA1).await;
+    let mut entries: Vec<(String, &str, &str, u64)> = vec![
+        ("SKILL.md".to_owned(), "blob", "100644", 10),
+        ("skills/detector/SKILL.md".to_owned(), "blob", "100644", 10),
+        ("skills/rewriter/SKILL.md".to_owned(), "blob", "100644", 10),
+    ];
+    entries.extend((0..450).map(|i| (format!("evals/case{i}.json"), "blob", "100644", 5)));
+    let refs: Vec<(&str, &str, &str, u64)> = entries.iter().map(|(p, t, m, s)| (p.as_str(), *t, *m, *s)).collect();
+    mocks.tree("conor", "avoid", SHA1, &refs, false).await;
+    mocks
+        .raw(
+            "conor",
+            "avoid",
+            SHA1,
+            "skills/detector/SKILL.md",
+            "---\nname: detector\ndescription: Finds patterns.\n---\nx",
+        )
+        .await;
+    mocks
+        .raw("conor", "avoid", SHA1, "skills/rewriter/SKILL.md", "---\nname: rewriter\ndescription: Rewrites.\n---\nx")
+        .await;
+    let hub = mocks.hub(dir.path());
+    let InstallOutcome::Choose { candidates, note, .. } = hub.stage("conor/avoid").await else { panic!() };
+    assert_eq!(candidates.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["detector", "rewriter"]);
+    assert!(note.as_deref().unwrap_or_default().contains("453 files"), "{note:?}");
+
+    // Small enough to take whole, and also holding skill folders: the root is the first choice.
+    mocks.commit("owner", "both", "HEAD", SHA2).await;
+    mocks
+        .tree(
+            "owner",
+            "both",
+            SHA2,
+            &[("SKILL.md", "blob", "100644", 10), ("skills/pdf/SKILL.md", "blob", "100644", 10)],
+            false,
+        )
+        .await;
+    mocks.raw("owner", "both", SHA2, "SKILL.md", "---\nname: both\ndescription: The whole thing.\n---\nx").await;
+    mocks.raw("owner", "both", SHA2, "skills/pdf/SKILL.md", PDF).await;
+    let InstallOutcome::Choose { candidates, note, .. } = hub.stage("owner/both").await else { panic!() };
+    assert_eq!(candidates[0].name, "both");
+    assert_eq!(candidates[0].tap, format!("owner/both@{SHA2}"));
+    assert_eq!(candidates[0].path, "(the whole repository)");
+    assert_eq!(candidates[1].name, "pdf");
+    assert!(note.as_deref().unwrap_or_default().contains("itself a skill"), "{note:?}");
 }
 
 #[tokio::test]

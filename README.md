@@ -159,12 +159,15 @@ A dimmed row is a model that doesn't declare tool calling: it can chat, but it c
 
 - Skills follow the [Agent Skills](https://agentskills.io) format: a folder with a `SKILL.md`. A small index goes in the prompt; a skill's instructions load only when a task matches, or when you type `/skill-name`.
 - **Scanned before they can be enabled** for piped-to-shell downloads, decode-and-execute, destructive deletes, credential reads, exfiltration of environment variables, prompt-injection phrases and invisible characters. A `dangerous` verdict can't be overridden; `caution` is shown with its findings. A project's skills stay off until you `/trust` the folder, and trust is pinned to the folder's content.
-- **Install from hubs:** `/skill install official/security/godmode`, a bare name looked up in the Hermes index (100k skills), `owner/repo/folder[@ref]`, a GitHub, skills.sh or `SKILL.md` link, or a folder. Nothing fetched is executed and no git runs: files come through GitHub's tree listing into a staging folder, are scanned, and are shown with the pinned commit, what the skill declares (tools, scripts, environment variables), its size and the verdict. `y` enable, `k` keep off, `n` discard, `r` read the file.
+- **Install from hubs:** `/skill install official/security/godmode`, a bare name looked up in the Hermes index (100k skills, which also covers ClawHub, skills.sh and LobeHub listings), `owner/repo/folder[@ref]`, a GitHub, skills.sh or `SKILL.md` link, or a folder. Nothing fetched is executed and no git runs: files come through GitHub's tree listing into a staging folder, are scanned, and are shown with the pinned commit, what the skill declares (tools, scripts, environment variables), its size and the verdict. `y` enable, `k` keep off, `n` discard, `r` read the file.
+- **Whole lists, with tick boxes.** Point it at a repository or a Hermes category (`/skill install official/security`, `/skill install anthropics/skills`) and every skill in it is listed: `space` ticks one, `a` ticks them all, Enter fetches the ticked set into a checklist that shows each one's verdict as it lands, and `y` installs what's ticked (a dangerous one stays off). Search hits tick with `tab` and `^a`. A repository that is itself a skill but too large to take whole (a monorepo with evals and tooling around it) offers its skill folders instead.
+- **Paste.** With the install prompt open, paste several links or names (one per line) for a checklist, or paste a `SKILL.md` itself: it's staged from the text, scanned and previewed like anything else, and recorded as pasted so `u` knows there's nowhere to update it from.
 - **Updates.** Each installed skill records where it came from and which commit. `u` fetches the newest one and lists the files that would change before replacing anything.
 
 ### Plugins
 
 - From the **Hermes plugin catalog** (1,200 plugins: `/plugin install better-session-appearance`), **Claude Code marketplaces** you follow (`/plugin marketplace add anthropics/claude-plugins-official`, then `b` to browse or `name@marketplace`), GitHub, or a folder, including what Claude Code itself has installed (listed read-only; Enter brings one over).
+- **Browse by category.** The catalog browser (`b` on the Plugins tab) shows Hermes' categories (tools, desktop, models, memory, general, automation, web, platform, voice) on a line: `←`/`→` move along it, typing filters within it, `tab` ticks a plugin, `^a` ticks everything shown, and Enter fetches the ticked set into one checklist. A checklist takes 25 at a time, because each plugin is at least one GitHub listing and GitHub allows 60 an hour without a `GITHUB_TOKEN`.
 - **The preview uses Hermes' own words:** `name [tier] pinned @ sha · maintained by …`, then what runs here and what doesn't. A plugin's skills and command files become skills; its `mcp.json` servers join the MCP tab. Python code, desktop parts, agents and LSP servers are listed as not run. Claude Code hooks are translated into a file beside the plugin for you to read and copy, never loaded on their own. Marketplace sources that execute code on install (`npm`, `command`) are refused with the reason.
 
 ### Memory and instructions
@@ -294,7 +297,7 @@ re-code mcp add "npx -y mcp-searxng@latest" --name searxng
 
 re-code skill list|search|install|update|remove|enable|disable
 re-code skill install official/security/godmode --keep-off
-re-code skill install anthropics/skills/skills/pdf --yes
+re-code skill install anthropics/skills/skills/pdf anthropics/skills/skills/xlsx --yes   # several at once
 
 re-code plugin list|search|install|update|remove|enable|disable
 re-code plugin marketplace add|list|remove|browse

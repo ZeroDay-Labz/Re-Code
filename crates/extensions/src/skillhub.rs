@@ -5,7 +5,7 @@
 //! into re-code's skills folder, with a `.re-code-source.toml` recording where it came from and which
 //! commit, so it can be updated.
 
-use crate::fetch::{Caps, Fetcher, Folder, check_relative, human, utc_stamp, write_file};
+use crate::fetch::{Caps, EntryKind, Fetcher, Folder, check_relative, human, utc_stamp, write_file};
 use crate::{frontmatter, scan, skills};
 use recode_core::extensions::{
     Declares, Finding, InstallOutcome, InstallPreview, InstalledSource, Replacing, Severity, SkillCandidate,
@@ -316,9 +316,54 @@ impl Hub {
         }
     }
 
+    /// Stages a skill from pasted `SKILL.md` text (front matter and body). Nothing else comes with it.
+    pub fn stage_text(&self, text: &str) -> InstallOutcome {
+        let tap = "pasted".to_owned();
+        let staged = (|| -> Result<InstallOutcome, String> {
+            if !Self::looks_like_skill_text(text) {
+                return Err(
+                    "That isn't a SKILL.md: it needs front matter (between --- lines) with a name and a description."
+                        .to_owned(),
+                );
+            }
+            let (id, dest) = self.fresh_staging()?;
+            write_file(&dest.join("SKILL.md"), text.as_bytes(), false).map_err(|error| {
+                let _ = std::fs::remove_dir_all(&id);
+                format!("couldn't write the pasted SKILL.md: {error}")
+            })?;
+            let source = InstalledSource {
+                tap: tap.clone(),
+                repo: "pasted text".to_owned(),
+                path: String::new(),
+                sha: String::new(),
+                label: "pasted".to_owned(),
+                installed_at: String::new(),
+            };
+            let note = Some("Pasted as text: only the SKILL.md came with it, nothing it refers to.".to_owned());
+            self.examine(&id, dest, source, Vec::new(), note, None)
+        })();
+        match staged {
+            Ok(outcome) => outcome,
+            Err(error) => InstallOutcome::Failed { tap, error },
+        }
+    }
+
+    /// Whether pasted text looks like a skill file rather than a link or a name.
+    #[must_use]
+    pub fn looks_like_skill_text(text: &str) -> bool {
+        let trimmed = text.trim_start();
+        trimmed.starts_with("---") && trimmed.contains("\nname:") && trimmed.contains("description:")
+    }
+
     /// Stages the newest version of an installed skill, with what would change.
     pub async fn update(&self, name: &str) -> InstallOutcome {
         let tap = format!("update {name}");
+        if read_source(&self.skills_dir.join(name)).is_some_and(|source| source.label == "pasted") {
+            return InstallOutcome::Failed {
+                tap,
+                error: format!("{name} was pasted as text, so there's nowhere to fetch an update from."),
+            };
+        }
         let Some(source) = read_source(&self.skills_dir.join(name)) else {
             let error = if self.skills_dir.join(name).join("SKILL.md").is_file() {
                 format!("{name} wasn't installed from a hub, so there's nothing to update it from.")
@@ -478,16 +523,42 @@ impl Hub {
             return Ok(InstallOutcome::UpToDate { name: skill_folder_name(&self.skills_dir, current), sha });
         }
         let tree = self.fetcher.tree(owner, repo, &sha, &subdir).await?;
-        let dirs = tree.skill_dirs();
-        if dirs.first().map(String::as_str) != Some("") {
+        let mut dirs = tree.skill_dirs();
+        let place = if subdir.is_empty() { format!("{owner}/{repo}") } else { format!("{owner}/{repo}/{subdir}") };
+        let root_is_skill = dirs.first().map(String::as_str) == Some("");
+        // A root SKILL.md over a whole repository (a monorepo that also ships its skills in folders, or
+        // one with evals, packaging and tooling around it) is offered folder by folder instead.
+        let root_too_big = root_is_skill && {
+            let files = tree.entries.iter().filter(|entry| entry.kind == EntryKind::File);
+            let (count, bytes) = files.fold((0usize, 0u64), |(n, b), entry| (n + 1, b + entry.size));
+            count > self.caps.max_files || bytes > self.caps.max_total_bytes
+        };
+        let mut note = note;
+        if root_is_skill && (dirs.len() > 1 || root_too_big) {
+            if root_too_big {
+                dirs.remove(0);
+                if dirs.is_empty() {
+                    return Err(format!(
+                        "{place} is one skill of {} files; the limit is {}. Install a folder of it instead.",
+                        tree.entries.iter().filter(|entry| entry.kind == EntryKind::File).count(),
+                        self.caps.max_files
+                    ));
+                }
+                note = Some(format!(
+                    "The whole of {place} is too large to take as one skill ({} files; the limit is {}), so its skill folders are offered instead.",
+                    tree.entries.iter().filter(|entry| entry.kind == EntryKind::File).count(),
+                    self.caps.max_files
+                ));
+            } else {
+                note = Some(format!("{place} is itself a skill (the first row) and also holds skills in folders."));
+            }
+        }
+        if !root_is_skill || dirs.len() > 1 || root_too_big {
             if dirs.is_empty() {
-                let place =
-                    if subdir.is_empty() { format!("{owner}/{repo}") } else { format!("{owner}/{repo}/{subdir}") };
                 let more = if tree.truncated { " (GitHub listed only part of it)" } else { "" };
                 return Err(format!("{place} has no SKILL.md anywhere{more}."));
             }
             let candidates = self.candidates(owner, repo, &sha, &subdir, &dirs).await;
-            let mut note = note;
             if tree.truncated {
                 note =
                     Some("GitHub listed only part of this repository; there may be more skills than shown.".to_owned());
@@ -525,22 +596,35 @@ impl Hub {
     ) -> Vec<SkillCandidate> {
         let mut tasks = tokio::task::JoinSet::new();
         for (index, dir) in dirs.iter().take(MAX_CANDIDATES).enumerate() {
-            let full = if subdir.is_empty() { dir.clone() } else { format!("{subdir}/{dir}") };
+            let full = match (subdir.is_empty(), dir.is_empty()) {
+                (true, true) => String::new(),
+                (true, false) => dir.clone(),
+                (false, true) => subdir.to_owned(),
+                (false, false) => format!("{subdir}/{dir}"),
+            };
             let fetcher = self.fetcher.clone();
             let (owner, repo, sha) = (owner.to_owned(), repo.to_owned(), sha.to_owned());
             tasks.spawn(async move {
-                let text = fetcher.raw(&owner, &repo, &sha, &format!("{full}/SKILL.md"), 256 * 1024).await.ok();
+                let file = if full.is_empty() { "SKILL.md".to_owned() } else { format!("{full}/SKILL.md") };
+                let text = fetcher.raw(&owner, &repo, &sha, &file, 256 * 1024).await.ok();
                 let front = text
                     .as_deref()
                     .and_then(|bytes| std::str::from_utf8(bytes).ok())
                     .map(|text| frontmatter::split(text).0.map(frontmatter::parse).unwrap_or_default())
                     .unwrap_or_default();
-                let name = front.name.unwrap_or_else(|| full.rsplit('/').next().unwrap_or(&full).to_owned());
+                let fallback =
+                    if full.is_empty() { repo.clone() } else { full.rsplit('/').next().unwrap_or(&full).to_owned() };
+                let name = front.name.unwrap_or(fallback);
+                let tap = if full.is_empty() {
+                    format!("{owner}/{repo}@{sha}")
+                } else {
+                    format!("{owner}/{repo}/{full}@{sha}")
+                };
                 (
                     index,
                     SkillCandidate {
-                        tap: format!("{owner}/{repo}/{full}@{sha}"),
-                        path: full,
+                        tap,
+                        path: if full.is_empty() { "(the whole repository)".to_owned() } else { full },
                         name,
                         description: front.description.unwrap_or_default(),
                     },

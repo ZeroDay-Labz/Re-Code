@@ -310,6 +310,11 @@ impl Manager {
             | ExtensionCommand::UpdateSkill(_)
             | ExtensionCommand::SearchSkills(_)
             | ExtensionCommand::StagePlugin(_)
+            | ExtensionCommand::StageSkillBatch(_)
+            | ExtensionCommand::StageSkillText(_)
+            | ExtensionCommand::CommitInstallBatch(_)
+            | ExtensionCommand::StagePluginBatch(_)
+            | ExtensionCommand::CommitPluginBatch(_)
             | ExtensionCommand::CommitPlugin { .. }
             | ExtensionCommand::SetPluginEnabled(..)
             | ExtensionCommand::DeletePlugin(_)
@@ -1463,6 +1468,99 @@ async fn drive(
                             .send(UiEvent::Install(InstallOutcome::Failed { tap, error: HUB_UNAVAILABLE.to_owned() }));
                     }
                 }
+            }
+            UiCommand::Extension(ExtensionCommand::StageSkillText(text)) => {
+                let outcome = match skill_hub.as_deref() {
+                    Some(hub) => hub.stage_text(&text),
+                    None => InstallOutcome::Failed { tap: "pasted".to_owned(), error: HUB_UNAVAILABLE.to_owned() },
+                };
+                let _ = events.send(UiEvent::Install(outcome));
+            }
+            UiCommand::Extension(ExtensionCommand::StageSkillBatch(taps)) => {
+                let sink = events.clone();
+                match skill_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let mut items = Vec::new();
+                            for tap in taps {
+                                let outcome = hub.stage(&tap).await;
+                                items.push((tap, outcome));
+                            }
+                            let _ = sink.send(UiEvent::InstallBatch(items));
+                        });
+                    }
+                    None => {
+                        let items = taps
+                            .into_iter()
+                            .map(|tap| (tap.clone(), InstallOutcome::Failed { tap, error: HUB_UNAVAILABLE.to_owned() }))
+                            .collect();
+                        let _ = sink.send(UiEvent::InstallBatch(items));
+                    }
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::CommitInstallBatch(items)) => {
+                let mut done = Vec::new();
+                let mut failed = Vec::new();
+                for (staging, enable) in items {
+                    match skill_hub.as_deref().map(|hub| hub.commit(&staging, enable)) {
+                        Some(Ok(committed)) => {
+                            let _ = manager.extensions.set_skill_enabled(&committed.name, committed.enabled);
+                            done.push(format!("{} ({})", committed.name, if committed.enabled { "on" } else { "off" }));
+                        }
+                        Some(Err(error)) => failed.push(error),
+                        None => failed.push(HUB_UNAVAILABLE.to_owned()),
+                    }
+                }
+                let mut text = if done.is_empty() { String::new() } else { format!("Installed {}.", done.join(", ")) };
+                if !failed.is_empty() {
+                    text.push_str(&format!(" Not installed: {}", failed.join("; ")));
+                }
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text, is_error: done.is_empty() });
+            }
+            UiCommand::Extension(ExtensionCommand::StagePluginBatch(taps)) => {
+                let sink = events.clone();
+                let markets = manager.extensions.marketplaces().to_vec();
+                match plugin_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let mut items = Vec::new();
+                            for tap in taps {
+                                let outcome = hub.stage(&tap, &markets).await;
+                                items.push((tap, outcome));
+                            }
+                            let _ = sink.send(UiEvent::PluginInstallBatch(items));
+                        });
+                    }
+                    None => {
+                        let items = taps
+                            .into_iter()
+                            .map(|tap| (tap.clone(), PluginOutcome::Failed { tap, error: HUB_UNAVAILABLE.to_owned() }))
+                            .collect();
+                        let _ = sink.send(UiEvent::PluginInstallBatch(items));
+                    }
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::CommitPluginBatch(items)) => {
+                let mut done = Vec::new();
+                let mut failed = Vec::new();
+                for (staging, enable) in items {
+                    match plugin_hub.as_deref().map(|hub| hub.commit(&staging, enable)) {
+                        Some(Ok(committed)) => {
+                            let _ = manager.extensions.set_plugin_enabled(&committed.name, committed.enabled);
+                            done.push(format!("{} ({})", committed.name, if committed.enabled { "on" } else { "off" }));
+                        }
+                        Some(Err(error)) => failed.push(error),
+                        None => failed.push(HUB_UNAVAILABLE.to_owned()),
+                    }
+                }
+                let mut text =
+                    if done.is_empty() { String::new() } else { format!("Installed plugins {}.", done.join(", ")) };
+                if !failed.is_empty() {
+                    text.push_str(&format!(" Not installed: {}", failed.join("; ")));
+                }
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text, is_error: done.is_empty() });
             }
             UiCommand::Extension(ExtensionCommand::UpdateSkill(name)) => {
                 let sink = events.clone();

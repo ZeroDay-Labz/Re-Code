@@ -2653,7 +2653,7 @@ dependencies = [
 
 [[package]]
 name = "re-code"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2684,7 +2684,7 @@ dependencies = [
 
 [[package]]
 name = "recode-core"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "serde",
  "serde_json",
@@ -2693,7 +2693,7 @@ dependencies = [
 
 [[package]]
 name = "recode-extensions"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "futures-util",
  "http",
@@ -2713,7 +2713,7 @@ dependencies = [
 
 [[package]]
 name = "recode-providers"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -2733,7 +2733,7 @@ dependencies = [
 
 [[package]]
 name = "recode-runtime"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "futures-util",
  "reqwest",
@@ -2746,7 +2746,7 @@ dependencies = [
 
 [[package]]
 name = "recode-store"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "recode-core",
  "rusqlite",
@@ -2757,7 +2757,7 @@ dependencies = [
 
 [[package]]
 name = "recode-tools"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "grep-matcher",
  "grep-regex",
@@ -2774,7 +2774,7 @@ dependencies = [
 
 [[package]]
 name = "recode-tui"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "crossterm",

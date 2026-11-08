@@ -12,18 +12,18 @@ expression: "screen(&draw(app, width, height))"
   ╭ Plugins and marketplaces ────────────────────────────────────────────────────────────────────────────────────────╮
   │❯ ● context7           claude-plugins-official @ 2c5958ec · 2 parts │ context7                                    │
   │  ◌ better-session-appea…  community @ 3ee27002 · nothing runs here │ Upstash Context7 MCP server for up-to-date  │
-  │  ⌂ claude-plugins-official               marketplace · 317 plugins │ documentation lookup.                       │
-  │  ◇ rust-╭ Marketplace claude-plugins-official ─────────────────────────────────────────────────────────╮pinned @ │
-  │         │ Filter  ▏   3 of 3                                                                           │         │
+  │  ⌂ claud╭ Marketplace claude-plugins-official ─────────────────────────────────────────────────────────╮         │
+  │  ◇ rust-│ Filter  ▏   3 of 3                                                                           │pinned @ │
+  │         │ Category  all 3 · tools 2 · desktop 1                                                        │         │
   │         │                                                                                              │k (not   │
-  │         │ ❯ context7   development                                                                     │         │
-  │         │     Upstash Context7 MCP server for documentation lookup.                                    │         │
-  │         │   frontend-design  1.1.1   development                                                       │         │
-  │         │     Frontend design skill for UI/UX implementation                                           │         │
-  │         │   npm-thing   tools                                                                          │         │
-  │         │     can't be installed: this source runs code on install, which re-code never does           │         │
+  │         │ ❯ [ ] context7   development                                                                 │         │
+  │         │         Upstash Context7 MCP server for documentation lookup.                                │         │
+  │         │   [ ] frontend-design  1.1.1   development                                                   │         │
+  │         │         Frontend design skill for UI/UX implementation                                       │         │
+  │         │       npm-thing   tools                                                                      │         │
+  │         │         can't be installed: this source runs code on install, which re-code never does       │         │
   │         │                                                                                              │, not    │
-  │         │ enter install  ↑↓ choose  type to filter  esc cancel                                         │         │
+  │         │ enter install  tab tick  ^a all shown  ←→ category  esc cancel                               │         │
   │         │                                                                                              │ted.toml │
   │         │                                                                                              │nt into  │
   │         ╰──────────────────────────────────────────────────────────────────────────────────────────────╯         │

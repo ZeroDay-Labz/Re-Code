@@ -12,20 +12,20 @@ expression: "screen(&draw(app, width, height))"
   ╭ Skills ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
   │❯ ● review                                                    yours │ review                                      │
   │  ○ from-rep╭ Install a skill ───────────────────────────────────────────────────────────────────────╮ing,        │
-  │  ● borrowed│ anthropics/skills holds 5 skills. Which one?                                           │            │
+  │  ● borrowed│ anthropics/skills holds 5 skills. Which ones?                                          │            │
   │  ✗ damaged │                                                                                        │            │
-  │            │ ❯ pdf                                                                                  │            │
-  │            │     Work with pdf files, from reading to creating them.  ·  skills/pdf                 │stimated).  │
-  │            │   xlsx                                                                                 │ills/review/│
-  │            │     Work with xlsx files, from reading to creating them.  ·  skills/xlsx               │            │
-  │            │   docx                                                                                 │            │
-  │            │     Work with docx files, from reading to creating them.  ·  skills/docx               │hen you're  │
-  │            │   pptx                                                                                 │th Ctrl+L.  │
-  │            │     Work with pptx files, from reading to creating them.  ·  skills/pptx               │            │
-  │            │   frontend-design                                                                      │            │
-  │            │     Work with frontend-design files, from reading to creating them.  ·  skills/fronte… │            │
+  │            │ ❯ [ ] pdf                                                                              │            │
+  │            │         Work with pdf files, from reading to creating them.  ·  skills/pdf             │stimated).  │
+  │            │   [ ] xlsx                                                                             │ills/review/│
+  │            │         Work with xlsx files, from reading to creating them.  ·  skills/xlsx           │            │
+  │            │   [ ] docx                                                                             │            │
+  │            │         Work with docx files, from reading to creating them.  ·  skills/docx           │hen you're  │
+  │            │   [ ] pptx                                                                             │th Ctrl+L.  │
+  │            │         Work with pptx files, from reading to creating them.  ·  skills/pptx           │            │
+  │            │   [ ] frontend-design                                                                  │            │
+  │            │         Work with frontend-design files, from reading to creating them.  ·  skills/fr… │            │
   │            │                                                                                        │            │
-  │            │ enter fetch this one  ↑↓ choose  esc cancel                                            │            │
+  │            │ enter fetch this one  space tick  a all  ↑↓ choose  esc cancel                         │            │
   │            │                                                                                        │            │
   │            ╰────────────────────────────────────────────────────────────────────────────────────────╯            │
   │                                                                    │                                             │

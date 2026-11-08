@@ -4,20 +4,20 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 ╭ Install a skill ─────────────────────────────────────────╮
-│ anthropics/skills holds 5 skills. Which one?             │
+│ anthropics/skills holds 5 skills. Which ones?            │
 │                                                          │
-│ ❯ pdf                                                    │
-│     Work with pdf files, from reading to creating them.… │
-│   xlsx                                                   │
-│     Work with xlsx files, from reading to creating them… │
-│   docx                                                   │
-│     Work with docx files, from reading to creating them… │
-│   pptx                                                   │
-│     Work with pptx files, from reading to creating them… │
-│   frontend-design                                        │
-│     Work with frontend-design files, from reading to cr… │
+│ ❯ [ ] pdf                                                │
+│         Work with pdf files, from reading to creating t… │
+│   [ ] xlsx                                               │
+│         Work with xlsx files, from reading to creating … │
+│   [ ] docx                                               │
+│         Work with docx files, from reading to creating … │
+│   [ ] pptx                                               │
+│         Work with pptx files, from reading to creating … │
+│   [ ] frontend-design                                    │
+│         Work with frontend-design files, from reading t… │
 │                                                          │
-│ enter fetch this one  ↑↓ choose  esc cancel              │
+│ enter fetch this one  space tick  a all  ↑↓ choose       │
 │                                                          │
 ╰──────────────────────────────────────────────────────────╯
  ╰────────────────────────────────────────────────────────╯

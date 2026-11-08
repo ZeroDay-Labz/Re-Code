@@ -270,6 +270,10 @@ pub enum Overlay {
         selected: usize,
         loading: bool,
         error: Option<String>,
+        /// Taps ticked for a batch install (Tab ticks, Ctrl+A ticks all).
+        ticked: std::collections::BTreeSet<String>,
+        /// Only this category is shown (←/→ cycle through the ones present).
+        category: Option<String>,
     },
     /// Searching the skill hubs: type, Enter searches, Enter on a hit fetches it.
     SkillSearch {
@@ -279,6 +283,8 @@ pub enum Overlay {
         searching: bool,
         error: Option<String>,
         note: Option<String>,
+        /// Taps ticked for a batch install (Tab ticks, Ctrl+A ticks all).
+        ticked: std::collections::BTreeSet<String>,
     },
     /// Choosing which of a server's tools the model may use.
     ToolFilter {
@@ -4417,6 +4423,9 @@ impl App {
     pub fn paste(&mut self, text: &str) {
         if let Some(Overlay::FreeSetup(FreeStep::Key { key, .. })) = &mut self.overlay {
             key.push_str(text.trim());
+        } else if matches!(self.overlay, Some(Overlay::Install(_))) {
+            let actions = self.paste_into_install(text);
+            self.pending_actions.extend(actions);
         } else if let Some(Overlay::Form(form)) = &mut self.overlay {
             form.paste(text);
         } else if self.overlay.is_none() && self.screen == Screen::Conversation {

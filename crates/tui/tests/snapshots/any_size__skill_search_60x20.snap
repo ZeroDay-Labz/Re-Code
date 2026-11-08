@@ -9,12 +9,12 @@ expression: "screen(&draw(app, width, height))"
 ╭ Search skill hubs ───────────────────────────────────────╮
 │ Search  pdf▏                                             │
 │                                                          │
-│ ❯ pdf   community                                        │
-│     Work with PDF files.  ·  anthropics/skills/skills/p… │
-│   pdf-forms   official                                   │
-│     Fill PDF forms from structured data.  ·  NousResear… │
+│ ❯ [ ] pdf   community                                    │
+│         Work with PDF files.  ·  anthropics/skills/skil… │
+│   [ ] pdf-forms   official                               │
+│         Fill PDF forms from structured data.  ·  NousRe… │
 │                                                          │
-│ enter install  ↑↓ choose  type to search again           │
+│ enter install  tab tick  ^a all  ↑↓ choose  esc cancel   │
 │                                                          │
 │                                                          │
 ╰──────────────────────────────────────────────────────────╯

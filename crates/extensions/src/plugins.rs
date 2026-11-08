@@ -1156,6 +1156,7 @@ impl PluginHub {
                         ResolvedSource::Unsupported(why) => Some(why),
                         _ => None,
                     },
+                    category: plugin.category.clone(),
                 }
             })
             .collect())
@@ -1220,6 +1221,7 @@ fn catalog_listing(entry: &CatalogEntry) -> PluginListing {
         label: entry.tier.clone().or_else(|| entry.category.clone()).unwrap_or_else(|| "community".to_owned()),
         version: entry.version.clone(),
         unsupported: (entry.sha.len() != 40).then(|| "no commit pin in the catalog".to_owned()),
+        category: entry.category.clone(),
     }
 }
 

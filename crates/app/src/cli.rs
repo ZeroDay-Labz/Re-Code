@@ -196,7 +196,9 @@ pub struct ListArgs {
 
 #[derive(Debug, Args)]
 pub struct InstallArgs {
-    pub what: String,
+    /// One or more things to install; with several, each is previewed and decided in turn.
+    #[arg(required = true, num_args = 1..)]
+    pub what: Vec<String>,
     #[command(flatten)]
     pub decide: Decide,
     /// Print the preview as JSON too.
@@ -456,8 +458,16 @@ async fn skill(session: &mut Session, action: SkillAction) -> Result<i32, String
         }
         SkillAction::Install(args) => {
             let hub = session.skill_hub()?;
-            let outcome = hub.stage(&args.what).await;
-            finish_skill(session, &hub, outcome, args.decide, args.json)
+            let mut worst = OK;
+            for what in &args.what {
+                if args.what.len() > 1 {
+                    println!("── {what}");
+                }
+                let outcome = hub.stage(what).await;
+                let code = finish_skill(session, &hub, outcome, args.decide, args.json)?;
+                worst = worst.max(code);
+            }
+            Ok(worst)
         }
         SkillAction::Update { name, decide } => {
             let hub = session.skill_hub()?;
@@ -614,8 +624,16 @@ async fn plugin(session: &mut Session, action: PluginAction) -> Result<i32, Stri
         }
         PluginAction::Install(args) => {
             let hub = session.plugin_hub()?;
-            let outcome = hub.stage(&args.what, &markets).await;
-            finish_plugin(session, &hub, outcome, args.decide, args.json)
+            let mut worst = OK;
+            for what in &args.what {
+                if args.what.len() > 1 {
+                    println!("── {what}");
+                }
+                let outcome = hub.stage(what, &markets).await;
+                let code = finish_plugin(session, &hub, outcome, args.decide, args.json)?;
+                worst = worst.max(code);
+            }
+            Ok(worst)
         }
         PluginAction::Update { name, decide } => {
             let hub = session.plugin_hub()?;

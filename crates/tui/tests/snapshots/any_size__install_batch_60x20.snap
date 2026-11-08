@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+╭ Install skills ──────────────────────────────────────────╮
+│ 2 of 3 skills can be installed; 2 ticked.                │
+│                                                          │
+│ ❯ [x] godmode                                            │
+│         The godmode skill, described in a line.  ·  2 f… │
+│   [x] evil                                               │
+│         The evil skill, described in a line.  ·  2 file… │
+│       x/y                                                │
+│         GitHub has no x/y, or it's private.              │
+│                                                          │
+│ y install ticked  k install off  space tick  a all       │
+│                                                          │
+╰──────────────────────────────────────────────────────────╯
+ │                                                        │
+ │                                                        │
+ ╰────────────────────────────────────────────────────────╯
+ a add  i install  e edit  space on/off  d delete  s search

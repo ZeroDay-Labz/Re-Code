@@ -294,6 +294,10 @@ fn apply_event(app: &mut App, event: UiEvent) {
         UiEvent::McpSearch { query, hits, error } => app.mcp_search_result(&query, hits, error),
         UiEvent::Install(outcome) => app.install_outcome(outcome),
         UiEvent::PluginInstall(outcome) => app.plugin_outcome(outcome),
+        UiEvent::InstallBatch(items) => app.install_batch(items.into_iter().map(|(tap, o)| (tap, Ok(o))).collect()),
+        UiEvent::PluginInstallBatch(items) => {
+            app.install_batch(items.into_iter().map(|(tap, o)| (tap, Err(o))).collect())
+        }
         UiEvent::PluginListings { title, listings, error } => app.plugin_listings(&title, listings, error),
         UiEvent::SkillSearch { query, hits, note, error } => app.skill_search_result(&query, hits, note, error),
         UiEvent::ToolStatus { active, summary } => {

@@ -5,6 +5,32 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-08
+
+### Added
+
+- Tick boxes on every install list. A repository or Hermes category with several skills lists them with
+  `space` to tick and `a` to tick all; Enter fetches the ticked set into a checklist that shows each
+  one's verdict as it lands, and `y` installs the ticked ones (a dangerous one stays off), `k` installs
+  them off, `n` discards them all. Skill search hits and plugin listings tick with `tab` and `^a`.
+- The plugin browser groups the Hermes catalog by its categories (tools, desktop, models, memory,
+  general, automation, web, platform, voice): `←`/`→` move along them, and `^a` ticks everything shown.
+  A checklist takes 25 at a time, since each one is a GitHub listing and GitHub allows 60 an hour
+  without a `GITHUB_TOKEN`.
+- Paste into the install prompt: several links or names (one per line) become a checklist; a pasted
+  `SKILL.md` is staged from the text, scanned and previewed, and recorded as pasted so an update knows
+  there is nowhere to fetch from.
+- `re-code skill install` and `re-code plugin install` take several things at once and preview each in
+  turn; the exit code is the worst of them.
+
+### Fixed
+
+- A repository that is itself a skill but holds more than the file limit (a monorepo with evals and
+  tooling around a root `SKILL.md`, such as conorbronsdon/avoid-ai-writing with 676 files) failed with
+  the limit; it now offers its skill folders to choose from, and says why the whole wasn't offered. A
+  small repository that is a skill and also holds skill folders lists the whole repository as the first
+  choice.
+
 ## [0.1.4] - 2026-11-08
 
 ### Added

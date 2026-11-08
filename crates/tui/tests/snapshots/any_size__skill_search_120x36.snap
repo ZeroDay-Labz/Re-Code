@@ -17,12 +17,12 @@ expression: "screen(&draw(app, width, height))"
   │            ╭ Search skill hubs ─────────────────────────────────────────────────────────────────────╮            │
   │            │ Search  pdf▏                                                                           │stimated).  │
   │            │                                                                                        │ills/review/│
-  │            │ ❯ pdf   community                                                                      │            │
-  │            │     Work with PDF files.  ·  anthropics/skills/skills/pdf                              │            │
-  │            │   pdf-forms   official                                                                 │hen you're  │
-  │            │     Fill PDF forms from structured data.  ·  NousResearch/hermes-agent/optional-skill… │th Ctrl+L.  │
+  │            │ ❯ [ ] pdf   community                                                                  │            │
+  │            │         Work with PDF files.  ·  anthropics/skills/skills/pdf                          │            │
+  │            │   [ ] pdf-forms   official                                                             │hen you're  │
+  │            │         Fill PDF forms from structured data.  ·  NousResearch/hermes-agent/optional-s… │th Ctrl+L.  │
   │            │                                                                                        │            │
-  │            │ enter install  ↑↓ choose  type to search again  esc cancel                             │            │
+  │            │ enter install  tab tick  ^a all  ↑↓ choose  esc cancel                                 │            │
   │            │                                                                                        │            │
   │            │                                                                                        │            │
   │            ╰────────────────────────────────────────────────────────────────────────────────────────╯            │

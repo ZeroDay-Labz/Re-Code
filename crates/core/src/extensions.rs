@@ -696,6 +696,9 @@ pub struct PluginListing {
     pub version: Option<String>,
     /// Why it can't be installed, when it can't (an `npm` or `command` source runs code on install).
     pub unsupported: Option<String>,
+    /// The catalog's category (Hermes: tools, desktop, models, memory, general, automation, web, platform, voice).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
 }
 
 /// A Claude Code marketplace re-code follows.
@@ -1020,6 +1023,16 @@ pub enum ExtensionCommand {
     UpdateSkill(String),
     /// Search the skill hubs.
     SearchSkills(String),
+    /// Stage several skills at once (pasted links, ticked search hits); the answer is one `InstallBatch`.
+    StageSkillBatch(Vec<String>),
+    /// Stage a skill from pasted `SKILL.md` text.
+    StageSkillText(String),
+    /// Move several staged skills into place, each on or off.
+    CommitInstallBatch(Vec<(String, bool)>),
+    /// Stage several plugins at once.
+    StagePluginBatch(Vec<String>),
+    /// Move several staged plugins into place.
+    CommitPluginBatch(Vec<(String, bool)>),
     /// Fetch a plugin (Hermes catalog name, `name@marketplace`, GitHub, or a folder) into staging and examine it.
     StagePlugin(String),
     /// Move a staged plugin into place, on or off.

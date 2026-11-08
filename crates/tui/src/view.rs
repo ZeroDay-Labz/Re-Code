@@ -982,7 +982,7 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
             draw_mcp_search(frame, area, &query, &hits, selected, searching, error.as_deref());
         }
         Overlay::Install(state) => crate::install_view::draw_install(frame, area, &state),
-        Overlay::PluginBrowse { title, listings, filter, selected, loading, error } => {
+        Overlay::PluginBrowse { title, listings, filter, selected, loading, error, ticked, category } => {
             crate::install_view::draw_plugin_browse(
                 frame,
                 area,
@@ -992,9 +992,11 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
                 selected,
                 loading,
                 error.as_deref(),
+                &ticked,
+                category.as_deref(),
             );
         }
-        Overlay::SkillSearch { query, hits, selected, searching, error, note } => {
+        Overlay::SkillSearch { query, hits, selected, searching, error, note, ticked } => {
             let view = crate::install_view::SearchView {
                 query: &query,
                 hits: &hits,
@@ -1002,6 +1004,7 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
                 searching,
                 error: error.as_deref(),
                 note: note.as_deref(),
+                ticked: &ticked,
             };
             crate::install_view::draw_skill_search(frame, area, &view);
         }
