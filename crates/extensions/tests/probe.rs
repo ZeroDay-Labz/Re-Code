@@ -28,6 +28,7 @@ fn server(script: &str, env: &[(&str, &str)]) -> McpServer {
         expose_to_agent: false,
         external: None,
         tools: None,
+        sandbox: recode_core::extensions::McpSandbox::default(),
     }
 }
 
@@ -77,6 +78,7 @@ async fn nothing_listening_is_reported() {
         expose_to_agent: false,
         external: None,
         tools: None,
+        sandbox: recode_core::extensions::McpSandbox::default(),
     };
     let McpProbe::Failed { error } = probe(&unreachable).await else { panic!("it should fail") };
     assert!(error.contains("127.0.0.1:9"), "{error}");

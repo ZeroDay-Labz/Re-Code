@@ -64,6 +64,13 @@ pub const WEB_SEARCH_PRESETS: &[McpPreset] = &[
         needs: "uv (Python); no key",
     },
     McpPreset {
+        name: "firecrawl",
+        connection: "npx -y firecrawl-mcp@latest",
+        settings: "FIRECRAWL_API_URL=http://127.0.0.1:3002, FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}",
+        note: "Search, scrape, crawl and map the web. Your own Firecrawl (its API address) or Firecrawl cloud with a key.",
+        needs: "A self-hosted Firecrawl (FIRECRAWL_API_URL; leave the key empty) or a key from firecrawl.dev, and Node.js",
+    },
+    McpPreset {
         name: "brave-search",
         connection: "npx -y @brave/brave-search-mcp-server@latest",
         settings: "BRAVE_API_KEY=${BRAVE_API_KEY}",
@@ -123,6 +130,36 @@ pub struct McpServer {
     /// Which of the server's tools the model may see and call. `None` means all of them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<ToolFilter>,
+    /// How a stdio server's program is run: inside bubblewrap (the default) or on the host.
+    #[serde(default, skip_serializing_if = "McpSandbox::is_default")]
+    pub sandbox: McpSandbox,
+}
+
+/// Where a stdio MCP server's program runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum McpSandbox {
+    /// Under bubblewrap with network: the project writable, the home folder emptied except toolchains and
+    /// package caches, secrets hidden. Servers that need more can opt out.
+    #[default]
+    Bubblewrap,
+    /// On the host, as the user, with the user's whole environment visible to it.
+    None,
+}
+
+impl McpSandbox {
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        *self == Self::Bubblewrap
+    }
+
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Bubblewrap => "bubblewrap",
+            Self::None => "none (host)",
+        }
+    }
 }
 
 /// A choice of tools from a server, by name or glob (`*` and `?`). `include` wins when both are set.
@@ -337,7 +374,15 @@ pub fn parse_mcp_form(name: &str, connection: &str, settings: &str, enabled: boo
         let command = words.next().ok_or("Enter a command to run, or an http:// or https:// address.")?;
         McpTransport::Stdio { command, args: words.collect(), env: settings }
     };
-    Ok(McpServer { name: name.to_owned(), transport, enabled, expose_to_agent: false, external: None, tools: None })
+    Ok(McpServer {
+        name: name.to_owned(),
+        transport,
+        enabled,
+        expose_to_agent: false,
+        external: None,
+        tools: None,
+        sandbox: McpSandbox::default(),
+    })
 }
 
 /// A command the agent will be able to run as a tool.
@@ -947,6 +992,8 @@ pub enum ExtensionCommand {
     TestProvider(String),
     /// Add MCP servers that are configured in Claude Code but not here.
     ImportClaudeMcp,
+    /// Add the MCP servers and providers from OpenCode's configuration (keys are never copied).
+    ImportOpenCode,
     /// Search the MCP registry for servers matching a query.
     SearchMcp(String),
     /// Choose which of a server's tools the model may see and call (`None` means all).

@@ -93,6 +93,7 @@ fn server(name: &str, entry: &Value, label: &str) -> McpServer {
         expose_to_agent: false,
         external: Some(ExternalSource { label: label.to_owned(), unsupported }),
         tools: None,
+        sandbox: recode_core::extensions::McpSandbox::default(),
     }
 }
 

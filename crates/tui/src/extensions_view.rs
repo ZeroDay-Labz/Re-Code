@@ -56,12 +56,20 @@ fn server_row(server: &McpServer, extensions: &ExtensionsSnapshot) -> Row {
             None => ("◐", Style::new().fg(color(Token::Attention)), "not tested".to_owned()),
         }
     };
-    let source = if server.external.is_some() { " · claude" } else { "" };
+    let source = match &server.external {
+        Some(external) if external.label.starts_with("plugin ") => " · plugin".to_owned(),
+        Some(external) if external.label.starts_with("OpenCode") => " · opencode".to_owned(),
+        Some(_) => " · claude".to_owned(),
+        None => String::new(),
+    };
+    let unsandboxed = matches!(server.transport, McpTransport::Stdio { .. })
+        && server.sandbox == recode_core::extensions::McpSandbox::None;
+    let sandbox = if unsandboxed { " · unsandboxed" } else { "" };
     Row {
         marker,
         marker_style,
         name: server.name.clone(),
-        right: format!("{kind}{source}  {status}"),
+        right: format!("{kind}{source}{sandbox}  {status}"),
         enabled: server.enabled && unsupported.is_none(),
     }
 }

@@ -16,9 +16,9 @@ expression: "screen(&draw(app, width, height))"
 │   fetch   no key                                         │
 │     Reads a web page as text for the model, with a star… │
 │     needs: uv (Python); no key                           │
-│   brave-search   key                                     │
-│     Brave's index: web, news, images; a free tier exist… │
-│     needs: A key from brave.com/search/api (free tier) … │
+│   firecrawl   key                                        │
+│     Search, scrape, crawl and map the web. Your own Fir… │
+│     needs: A self-hosted Firecrawl (FIRECRAWL_API_URL; … │
 │                                                          │
 │ enter fill the form  ↑↓ choose  esc cancel               │
 ╰──────────────────────────────────────────────────────────╯

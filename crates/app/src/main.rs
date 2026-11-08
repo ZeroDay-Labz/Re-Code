@@ -2,6 +2,7 @@
 
 mod background;
 mod chat;
+mod cli;
 mod compact;
 mod config;
 mod doctor;
@@ -95,6 +96,9 @@ enum Command {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+    /// MCP servers, skills, plugins, memory and trust, from the shell.
+    #[command(flatten)]
+    Extension(cli::Extension),
 }
 
 /// `ask`, `accept-edits`, `plan` or `auto`, as the command line spells them.
@@ -138,6 +142,10 @@ async fn main() -> Result<()> {
         Some(Command::Demo) => recode_tui::run_demo().await?,
         Some(Command::Completions { shell }) => {
             clap_complete::generate(shell, &mut Cli::command(), "re-code", &mut std::io::stdout());
+        }
+        Some(Command::Extension(extension)) => {
+            let code = cli::run(&paths, extension).await;
+            std::process::exit(code);
         }
         None if cli.print.is_some() => {
             let mut prompt = cli.print.clone().unwrap_or_default();

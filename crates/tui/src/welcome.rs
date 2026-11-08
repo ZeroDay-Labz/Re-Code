@@ -177,34 +177,36 @@ pub struct Only {
 }
 
 /// How the list is grouped.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Group {
     Local,
+    /// The provider charges nothing for it on this account, by its own listing.
     Free,
-    Paid,
+    /// Billed to the user's own account with that provider; one group per provider, so what a Gemini
+    /// key pays for isn't mixed with what an OpenRouter key pays for.
+    Paid {
+        provider: String,
+    },
     NeedsKey,
 }
 
 impl Group {
     #[must_use]
     pub fn of(model: &WelcomeModel) -> Self {
-        if model.provider_label.is_none() {
-            Self::Local
-        } else if model.needs_key {
-            Self::NeedsKey
-        } else if model.free {
-            Self::Free
-        } else {
-            Self::Paid
+        match &model.provider_label {
+            None => Self::Local,
+            Some(_) if model.needs_key => Self::NeedsKey,
+            Some(_) if model.free => Self::Free,
+            Some(provider) => Self::Paid { provider: provider.clone() },
         }
     }
 
-    fn label(self) -> &'static str {
+    fn label(&self) -> String {
         match self {
-            Self::Local => "On this computer",
-            Self::Free => "Free",
-            Self::Paid => "Paid",
-            Self::NeedsKey => "Needs a key",
+            Self::Local => "On this computer".to_owned(),
+            Self::Free => "Free · no charge on your account".to_owned(),
+            Self::Paid { provider } => format!("Paid · your {provider} account"),
+            Self::NeedsKey => "Needs a key".to_owned(),
         }
     }
 }
@@ -213,8 +215,8 @@ impl Group {
 fn heading_of(model: &WelcomeModel, by_provider: bool) -> String {
     match (&model.provider_label, by_provider) {
         (Some(label), true) => label.clone(),
-        (None, true) => Group::Local.label().to_owned(),
-        (_, false) => Group::of(model).label().to_owned(),
+        (None, true) => Group::Local.label(),
+        (_, false) => Group::of(model).label(),
     }
 }
 
@@ -502,6 +504,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
             items.extend([
                 ("a", "add"),
                 ("p", "preset"),
+                ("o", "opencode"),
                 ("t", "test"),
                 ("e", "edit"),
                 ("space", "on/off"),
@@ -516,6 +519,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 ("f", "tools"),
                 ("t", "test"),
                 ("i", "import"),
+                ("o", "opencode"),
                 ("e", "edit"),
                 ("space", "on/off"),
                 ("x", "expose"),
@@ -1089,7 +1093,8 @@ mod tests {
         let names = |state: &WelcomeState| -> Vec<String> {
             state.matches(&info).into_iter().map(|i| info.models[i].name.clone()).collect()
         };
-        assert_eq!(names(&state), ["local", "zen-free", "or-free", "or-paid", "anthropic-paid"]);
+        // Paid models sit under their own provider, providers in name order.
+        assert_eq!(names(&state), ["local", "zen-free", "or-free", "anthropic-paid", "or-paid"]);
         state.by_provider = true;
         assert_eq!(names(&state), ["local", "anthropic-paid", "zen-free", "or-free", "or-paid"]);
     }

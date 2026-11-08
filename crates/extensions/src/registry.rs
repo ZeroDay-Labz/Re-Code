@@ -61,6 +61,7 @@ pub async fn resolve_any(name: Option<&str>, text: &str) -> Result<Resolved, Str
                     expose_to_agent: false,
                     external: None,
                     tools: None,
+                    sandbox: recode_core::extensions::McpSandbox::default(),
                 }],
                 note: None,
             }
@@ -278,6 +279,7 @@ fn from_manifest(manifest: &ServerJson) -> Result<McpServer, String> {
         expose_to_agent: false,
         external: None,
         tools: None,
+        sandbox: recode_core::extensions::McpSandbox::default(),
     };
     let package_of = |kind: &str| {
         manifest.packages.iter().find(|package| {

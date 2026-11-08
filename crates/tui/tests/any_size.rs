@@ -1538,6 +1538,7 @@ fn mcp_search() -> App {
                 expose_to_agent: false,
                 external: None,
                 tools: None,
+                sandbox: recode_core::extensions::McpSandbox::default(),
             }),
             unsupported: None,
         },

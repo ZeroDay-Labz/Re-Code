@@ -65,6 +65,23 @@ fn connection_is_link(connection: &str) -> bool {
 }
 const SETTINGS_HINT: &str = "Optional. KEY=value, KEY2=${FROM_ENVIRONMENT}. Prefer ${...} for secrets.";
 
+const SANDBOX_CHOICES: &[&str] = &["bubblewrap", "none (host)"];
+
+fn sandbox_choice(sandbox: recode_core::extensions::McpSandbox) -> &'static str {
+    match sandbox {
+        recode_core::extensions::McpSandbox::Bubblewrap => SANDBOX_CHOICES[0],
+        recode_core::extensions::McpSandbox::None => SANDBOX_CHOICES[1],
+    }
+}
+
+fn parse_sandbox_choice(value: &str) -> recode_core::extensions::McpSandbox {
+    if value.trim().starts_with("none") {
+        recode_core::extensions::McpSandbox::None
+    } else {
+        recode_core::extensions::McpSandbox::Bubblewrap
+    }
+}
+
 fn field(label: &'static str, hint: &'static str, value: String) -> FormField {
     FormField { label, hint, value, choices: Vec::new(), secret: false }
 }
@@ -117,14 +134,18 @@ impl FormState {
     /// A form holding an existing server.
     #[must_use]
     pub fn edit_server(server: &McpServer) -> Self {
-        Self::server_form(
+        let mut form = Self::server_form(
             &format!("Edit {}", server.name),
             Some(server.name.clone()),
             &server.name,
             &server.connection_text(),
             &server.settings_text(),
             server.enabled,
-        )
+        );
+        if let Some(field) = form.fields.get_mut(3) {
+            field.value = sandbox_choice(server.sandbox).to_owned();
+        }
+        form
     }
 
     /// A form holding an existing tool.
@@ -208,6 +229,12 @@ impl FormState {
                 field("Name", "Letters, numbers, - and _.", name.to_owned()),
                 field("Command, address, link or pasted config", CONNECTION_HINT, connection.to_owned()),
                 field("Environment or headers", SETTINGS_HINT, settings.to_owned()),
+                choice_field(
+                    "Sandbox (stdio servers)",
+                    "bubblewrap: project writable, home emptied except toolchains and package caches, secrets hidden, network on. none: runs on the host with everything you can see. ←→ to change.",
+                    SANDBOX_CHOICES.to_vec(),
+                    SANDBOX_CHOICES[0].to_owned(),
+                ),
             ],
             focus: 0,
             error: None,
@@ -300,8 +327,11 @@ impl FormState {
                     let name = (!name.is_empty()).then(|| name.to_owned());
                     Ok(ExtensionCommand::AddMcpFromLink { name, link: connection.to_owned() })
                 } else {
-                    parse_mcp_form(value(0), value(1), value(2), *enabled)
-                        .map(|server| ExtensionCommand::SaveServer { original: original.clone(), server })
+                    let sandbox = parse_sandbox_choice(value(3));
+                    parse_mcp_form(value(0), value(1), value(2), *enabled).map(|mut server| {
+                        server.sandbox = sandbox;
+                        ExtensionCommand::SaveServer { original: original.clone(), server }
+                    })
                 }
             }
             FormKind::Tool { original, enabled } => parse_tool_form(value(0), value(1), value(2), value(3), *enabled)
@@ -393,7 +423,8 @@ mod tests {
         type_text(&mut form, "docs");
         form.handle_key(key(KeyCode::Tab));
         type_text(&mut form, "http://127.0.0.1:1/mcp");
-        form.handle_key(key(KeyCode::Enter));
+        form.handle_key(key(KeyCode::Enter)); // settings
+        form.handle_key(key(KeyCode::Enter)); // sandbox choice (left at bubblewrap)
         let FormOutcome::Submit(submitted) = form.handle_key(key(KeyCode::Enter)) else {
             panic!("the form didn't submit");
         };

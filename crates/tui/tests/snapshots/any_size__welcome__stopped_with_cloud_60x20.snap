@@ -12,9 +12,9 @@ expression: "screen(&draw(app, width, height))"
  │                                                        │
  │/ type to filter                                        │
  │                                                        │
- │─ Free · 1 ──────────────────────────────────────────── │
+ │─ Free · no charge on your account · 1 ──────────────── │
  │❯ ★ openrouter/free-coder              openrouter  tools│
- │─ Paid · 1 ──────────────────────────────────────────── │
+ │─ Paid · your openai account · 1 ────────────────────── │
  │  ☁ gpt-5-mini                             openai  tools│
  │                                                        │
  │                                                        │

@@ -6,8 +6,6 @@ expression: "screen(&draw(app, width, height))"
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
 │                 ╭ Web search for the model ────────────────────────────────────────────────────────╮                 │
 │                 │ Web search reaches the model as an MCP server. Pick one; the form opens with     │                 │
 │                 │ the command filled in, and your address or key stays in your own configuration.  │                 │
@@ -21,6 +19,9 @@ expression: "screen(&draw(app, width, height))"
 │                 │   fetch   no key                                                                 │                 │
 │                 │     Reads a web page as text for the model, with a start index for long pages. … │                 │
 │                 │     needs: uv (Python); no key                                                   │                 │
+│                 │   firecrawl   key                                                                │                 │
+│                 │     Search, scrape, crawl and map the web. Your own Firecrawl (its API address)… │                 │
+│                 │     needs: A self-hosted Firecrawl (FIRECRAWL_API_URL; leave the key empty) or … │                 │
 │                 │   brave-search   key                                                             │                 │
 │                 │     Brave's index: web, news, images; a free tier exists.                        │                 │
 │                 │     needs: A key from brave.com/search/api (free tier) and Node.js               │                 │
@@ -32,7 +33,6 @@ expression: "screen(&draw(app, width, height))"
 │                 │                                                                                  │                 │
 │                 │                                                                                  │                 │
 │                 ╰──────────────────────────────────────────────────────────────────────────────────╯                 │
-│                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭ ● Ready │ ask │ gpt-oss:20b ·  ──────────────────────────────────────────────────────────────────────────────────────╮
 │ ❯  Ask anything                                                                                                      │

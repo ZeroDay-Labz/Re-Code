@@ -50,7 +50,10 @@ fn huggingface(entry: &Value) -> ModelFacts {
             .map(|kinds| kinds.iter().filter_map(Value::as_str).any(|kind| kind == "image")),
         reasoning: None,
         context: hosts.iter().filter_map(|host| host.get("context_length").and_then(Value::as_u64)).max(),
-        free: Some(hosts.iter().all(|host| flag(host, "is_free") == Some(true))),
+        // Hugging Face's `is_free` means the model is served from the account's monthly included credits,
+        // which run out ("Purchase pre-paid credits to continue"), so it isn't free in re-code's sense:
+        // nothing charged on this account. The price still shows.
+        free: Some(false),
         price: cheapest,
         modalities: modalities_at(entry, "/architecture/input_modalities", "/architecture/output_modalities"),
         released: entry.get("created").and_then(Value::as_u64).map(ModelFacts::date_from_unix),
@@ -114,8 +117,12 @@ fn openrouter(entry: &Value) -> ModelFacts {
         vision: modalities.map(|kinds| kinds.iter().filter_map(Value::as_str).any(|kind| kind == "image")),
         reasoning: parameters.map(|list| list.iter().filter_map(Value::as_str).any(|p| p == "reasoning")),
         context: entry.get("context_length").and_then(Value::as_u64),
+        // Free means nothing is charged at all: not per token, not per request, image or audio either.
+        // Music and image models list $0 per token and charge per request, which is what caught people out.
         free: match (prompt, completion) {
-            (Some(prompt), Some(completion)) => Some(prompt == 0.0 && completion == 0.0),
+            (Some(_), Some(_)) => Some(entry.get("pricing").and_then(Value::as_object).is_some_and(|pricing| {
+                pricing.values().all(|v| v.as_str().and_then(|s| s.parse::<f64>().ok()).is_none_or(|p| p == 0.0))
+            })),
             _ => None,
         },
         // Per-token prices become per million, as everyone quotes them.
@@ -185,7 +192,7 @@ mod tests {
         assert_eq!(facts.hosts.as_deref(), Some("deepinfra"));
         let free = json!({"id": "x", "providers": [
             {"provider": "a", "status": "live", "is_free": true}, {"provider": "b", "status": "offline", "is_free": false}]});
-        assert_eq!(facts_from_listing(&free).free, Some(true));
+        assert_eq!(facts_from_listing(&free).free, Some(false), "included credits run out, so not free");
     }
 
     #[test]
@@ -205,6 +212,19 @@ mod tests {
         assert_eq!(facts.knowledge, None);
         assert_eq!(facts.retires.as_deref(), Some("2027-01-31"));
         assert_eq!(facts.modalities.as_deref(), Some("text → text"));
+    }
+
+    #[test]
+    fn per_request_charges_are_not_free() {
+        // A music model: $0 per token, charged per request. It isn't free, and it doesn't answer in text.
+        let lyria = json!({"id": "google/lyria-3-pro-preview", "pricing": {"prompt": "0", "completion": "0", "request": "0.06"},
+            "architecture": {"input_modalities": ["text"], "output_modalities": ["audio"]}});
+        let facts = facts_from_listing(&lyria);
+        assert_eq!(facts.free, Some(false));
+        assert!(facts.modalities.as_deref().unwrap().ends_with("audio"), "{:?}", facts.modalities);
+        let truly =
+            json!({"id": "x:free", "pricing": {"prompt": "0", "completion": "0", "request": "0", "image": "0"}});
+        assert_eq!(facts_from_listing(&truly).free, Some(true));
     }
 
     #[test]

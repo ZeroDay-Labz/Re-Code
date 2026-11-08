@@ -34,6 +34,7 @@ fn server(name: &str, expose: bool) -> McpServer {
         expose_to_agent: expose,
         external: None,
         tools: None,
+        sandbox: recode_core::extensions::McpSandbox::default(),
     }
 }
 
@@ -136,6 +137,7 @@ async fn an_unreachable_server_is_named_once_and_the_others_still_work() {
         expose_to_agent: false,
         external: None,
         tools: None,
+        sandbox: recode_core::extensions::McpSandbox::default(),
     };
     let mut hub = McpHub::new(vec![server("echo", false), down]);
     let listing = hub.list(None).await;

@@ -59,6 +59,11 @@ pub const SLASH_COMMANDS: &[SlashCommand] = &[
         name: "web", argument: "", description: "Give the model web search (SearXNG, DuckDuckGo, Brave…)"
     },
     SlashCommand {
+        name: "import",
+        argument: "opencode|claude",
+        description: "Bring in OpenCode's servers and providers, or Claude Code's MCP servers",
+    },
+    SlashCommand {
         name: "plugin",
         argument: "install|search|browse|update|marketplace add|remove [what]",
         description: "Install a plugin (Hermes catalog, Claude Code marketplaces, GitHub), or follow a marketplace",

@@ -220,7 +220,7 @@ API keys are stored in the OS keyring through the Secret Service (verified worki
 
 ### What exists today
 
-Testing a stdio server runs its program, so re-code shows the exact command and asks first. **That test isn't sandboxed yet**, which the prompt says. Results are cached, so opening the screen starts nothing. Values in `extensions.toml` are stored in plain text in an owner-only (`0600`) file until keyring storage arrives, so `${VARIABLE}` references are the better choice for secrets. They're masked on screen, and a damaged file is never overwritten. Skills found in a project stay off, and skills found in Claude Code's directory are read-only here.
+Testing a stdio server runs its program, so re-code shows the exact command and asks first. **Since 2026-11-08 stdio servers run in bubblewrap by default** (`crates/extensions/src/probe.rs`, `Launch::command_for`): the project is the writable folder, the home folder is a tmpfs with toolchains and package caches bound back, secrets are hidden, network is on, and the server's own environment goes in through `--setenv` so a key reaches only that process. A server can opt out in its form (Sandbox: none) when it needs the host, and the row says `unsandboxed`; without bubblewrap installed, servers run on the host and the test prompt says so. Results are cached, so opening the screen starts nothing. Values in `extensions.toml` are stored in plain text in an owner-only (`0600`) file until keyring storage arrives, so `${VARIABLE}` references are the better choice for secrets. They're masked on screen, and a damaged file is never overwritten. Skills found in a project stay off, and skills found in Claude Code's directory are read-only here.
 
 ## JetBrains MCP
 

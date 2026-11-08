@@ -7,6 +7,7 @@ pub mod claude;
 pub mod fetch;
 pub mod frontmatter;
 pub mod hub;
+pub mod opencode;
 pub mod paste;
 pub mod plugins;
 mod probe;
@@ -15,7 +16,7 @@ pub mod scan;
 pub mod skillhub;
 pub mod skills;
 
-pub use probe::probe;
+pub use probe::{Launch, probe, probe_with};
 
 use recode_core::extensions::{CustomTool, ExtensionsSnapshot, Marketplace, McpServer, ToolFilter, validate_name};
 use recode_core::providers::CloudProvider;
@@ -90,6 +91,8 @@ pub struct Locations {
     pub plugins_dir: PathBuf,
     /// Claude Code's plugin records (`~/.claude/plugins`), listed read-only.
     pub claude_plugins: Option<PathBuf>,
+    /// The user's config directory (`~/.config`), where OpenCode keeps `opencode/opencode.json`.
+    pub user_config_root: Option<PathBuf>,
 }
 
 /// The stored configuration.
@@ -449,6 +452,7 @@ mod tests {
             project: Some(dir.join("project")),
             plugins_dir: dir.join("data/plugins"),
             claude_plugins: Some(dir.join("claude/plugins")),
+            user_config_root: Some(dir.join("config")),
         }
     }
 

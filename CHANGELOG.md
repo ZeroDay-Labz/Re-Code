@@ -5,6 +5,34 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-08
+
+### Added
+
+- OpenCode import: `o` on the MCP and Providers tabs, `/import opencode`, or `re-code mcp import opencode`
+  reads `~/.config/opencode/opencode.json` (and a trusted project's) and brings over its MCP servers and
+  providers. Keys are never copied: `{env:VAR}` becomes a `${VAR}` reference, a literal key is reported;
+  OAuth remotes, agents, modes, JavaScript plugins and `instructions` are listed as not run here.
+- The command line does what the home screen does: `re-code mcp list|add|remove|enable|disable|test|import`,
+  `re-code skill list|search|install|update|remove|enable|disable`, `re-code plugin list|search|install|
+  update|remove|enable|disable|marketplace add|list|remove|browse`, `re-code memory list|show|forget`,
+  `re-code trust [--yes]` and `re-code untrust`. Lists take `--json`; installs print the same preview as
+  the interface and take `--yes` or `--keep-off` (exit 4 when a decision is needed and there's no terminal,
+  2 when refused).
+- Stdio MCP servers run in bubblewrap by default: the project writable, the home folder emptied except
+  toolchains and package caches, secrets hidden, network on, the server's environment passed in with
+  `--setenv` so a key reaches only that server. Each server has a Sandbox setting (bubblewrap or none) in
+  its form; the row says `unsandboxed` when it's off, and the test prompt says where the program runs.
+  Installed plugins' folders are bound writable for their servers.
+
+### Changed
+
+- "Free" on the Models tab now means the provider charges nothing at all for the model on your account:
+  a model that is $0 per token but charges per request (OpenRouter's music and image models) is no longer
+  called free, Hugging Face's "free" models (served from monthly included credits that run out) aren't
+  either, and models that don't answer in text aren't listed for chat. Paid models are grouped per
+  provider ("Paid · your gemini account"), so what one key pays for isn't mixed with another.
+
 ## [0.1.1] - 2026-11-08
 
 Adds `/web` to 0.1.0, which was tagged earlier the same day as the first packaged release (rpm and deb).

@@ -15,9 +15,9 @@ expression: "screen(&draw(app, width, height))"
  │                                                                                                │
  │/ type to filter                                        │ openrouter/free-coder                 │
  │                                                        │ qwen · 20B · Q4_K_M                   │
- │─ Free · 1 ───────────────────────────────────────────  │ Free Coder                            │
+ │─ Free · no charge on your account · 1 ───────────────  │ Free Coder                            │
  │❯ ★ openrouter/free-coder             openrouter  tools │                                       │
- │─ Paid · 1 ───────────────────────────────────────────  │ A compact model for agents and tool   │
+ │─ Paid · your openai account · 1 ─────────────────────  │ A compact model for agents and tool   │
  │  ☁ gpt-5-mini                            openai  tools │ calling, with a long context and      │
  │                                                        │ structured output. It reasons before  │
  │                                                        │ it answers. Prompts may be retained   │

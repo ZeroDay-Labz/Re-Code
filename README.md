@@ -97,7 +97,8 @@ re-code demo         # the interface with a recorded session, no model needed
 
 - Your own servers, plus the ones configured in Claude Code (user, project and approved `.mcp.json`), used live with their tool schemas.
 - Discover-then-call by default so a 200-tool server costs a small index, or expose a server's tools directly with `x`. Per-server tool filters the model can't bypass.
-- Add anything: a command line, an `http(s)://` address, a registry id, a `server.json` link, a GitHub repo, or a pasted config snippet from any other tool. Search the official registry with `s`.
+- Add anything: a command line, an `http(s)://` address, a registry id, a `server.json` link, a GitHub repo, or a pasted config snippet from any other tool. Search the official registry with `s`. Bring over what you set up in OpenCode with `o` (keys are never copied).
+- Stdio servers run in bubblewrap by default, with the project writable and a key reaching only that server; a server that needs the host can opt out in its form.
 - `/web` gives the model web search through a server of your choice: your own SearXNG by address, DuckDuckGo and a page reader without a key, or Brave, Tavily and Exa with one. The form opens prefilled.
 
 ### Skills and plugins
@@ -117,6 +118,7 @@ Every session is saved as it happens. `re-code --continue` or `/continue` picks 
 
 ### Automation
 
+- **The same management from the shell:** `re-code mcp add <command|address|link>`, `re-code skill install official/security/godmode --yes`, `re-code plugin marketplace add anthropics/claude-plugins-official`, `re-code memory list --json`, `re-code trust`. Installs print the same preview as the interface and ask, or take `--yes` / `--keep-off`.
 - `re-code -p "prompt"` runs one request without the interface, with text, JSON or streaming JSON output, `--max-turns`, `--allowed-tools` and `--permission-mode`. Exit codes say what happened: 0 done, 1 failed, 2 a tool that needed approval was denied, 3 no such model.
 - **Hooks** from `~/.config/re-code/hooks.toml` and a trusted project's `.re-code/hooks.toml`: `pre_tool_use` (block, change the arguments, add context), `post_tool_use`, `stop` and `session_start`, JSON on stdin, project hooks sandboxed.
 - **Background commands** keep running while you work (`/tasks`), and a `task` tool lets the model delegate a self-contained job to a helper with its own empty context.

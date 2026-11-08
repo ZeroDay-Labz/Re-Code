@@ -89,7 +89,7 @@ pub fn spawn(
     Link { events: event_receiver, commands }
 }
 
-fn locations(paths: &Paths) -> Locations {
+pub(crate) fn locations(paths: &Paths) -> Locations {
     let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
     Locations {
         config_file: paths.extensions_file.clone(),
@@ -100,6 +100,7 @@ fn locations(paths: &Paths) -> Locations {
         claude_skills: home.as_ref().map(|home| home.join(".claude/skills")),
         claude_plugins: home.map(|home| home.join(".claude/plugins")),
         plugins_dir: paths.data_dir.join("plugins"),
+        user_config_root: Some(paths.user_config_root.clone()),
     }
 }
 
@@ -301,6 +302,7 @@ impl Manager {
             | ExtensionCommand::SetProviderEnabled(..)
             | ExtensionCommand::TestProvider(_)
             | ExtensionCommand::ImportClaudeMcp
+            | ExtensionCommand::ImportOpenCode
             | ExtensionCommand::AddMcpFromLink { .. }
             | ExtensionCommand::StageSkill(_)
             | ExtensionCommand::CommitInstall { .. }
@@ -604,6 +606,14 @@ async fn scan(
                         .facts
                         .clone()
                         .merge(catalog.facts(&model.name).map(recode_core::model_facts::ModelFacts::without_pricing));
+                    // A model that doesn't answer in text (music, image and video generators) can't chat.
+                    if facts
+                        .modalities
+                        .as_deref()
+                        .is_some_and(|m| m.split_once('→').is_some_and(|(_, output)| !output.contains("text")))
+                    {
+                        continue;
+                    }
                     routes.insert(model.name.clone(), Route::Cloud { provider: provider.clone(), key: key.clone() });
                     let parameters = recode_core::model_facts::ModelFacts::parameters_from_name(&model.name);
                     info.models.push(WelcomeModel {
@@ -670,6 +680,67 @@ fn read_image_file(path: &std::path::Path) -> Option<ImageData> {
 
 /// Builds the agent configuration for a turn: built-in + custom tool schemas, the custom tools
 /// themselves, and any skill instructions whose triggers match the request.
+/// Brings an OpenCode import into the configuration and says what happened, in one message.
+pub(crate) fn summarise_opencode_import(
+    extensions: &mut Extensions,
+    import: recode_extensions::opencode::Import,
+) -> (String, bool) {
+    if import.files.is_empty() {
+        let mut text = "No OpenCode configuration was found (~/.config/opencode/opencode.json).".to_owned();
+        if let Some(path) = &import.held_back {
+            text = format!("{} holds OpenCode configuration; trust this folder (/trust) to import it.", path.display());
+        }
+        if !import.warnings.is_empty() {
+            text.push(' ');
+            text.push_str(&import.warnings.join(" "));
+        }
+        return (text, true);
+    }
+    let mut parts = Vec::new();
+    let servers: Vec<McpServer> =
+        import.servers.into_iter().map(|server| McpServer { external: None, ..server }).collect();
+    let server_count = servers.len();
+    match extensions.import_servers(servers) {
+        Ok(0) if server_count > 0 => parts.push("its MCP servers were already here".to_owned()),
+        Ok(0) => {}
+        Ok(n) => parts.push(format!("{n} MCP server(s) added (press t to test one)")),
+        Err(error) => parts.push(format!("MCP servers couldn't be saved: {error}")),
+    }
+    let mut added_providers = 0;
+    for provider in import.providers {
+        if extensions.provider(&provider.name).is_some() {
+            continue;
+        }
+        match extensions.save_provider(None, provider) {
+            Ok(()) => added_providers += 1,
+            Err(error) => parts.push(format!("a provider couldn't be saved: {error}")),
+        }
+    }
+    if added_providers > 0 {
+        parts.push(format!("{added_providers} provider(s) added without keys (k on the Providers tab stores one)"));
+    }
+    if !import.instructions.is_empty() {
+        parts.push(format!(
+            "OpenCode loads {} instruction file(s) ({}); re-code reads RE-CODE.md, AGENTS.md and CLAUDE.md instead",
+            import.instructions.len(),
+            import.instructions.join(", ")
+        ));
+    }
+    if !import.not_run.is_empty() {
+        parts.push(format!("not brought over: {}", import.not_run.join("; ")));
+    }
+    if let Some(path) = &import.held_back {
+        parts.push(format!("{} waits for /trust", path.display()));
+    }
+    let mut text =
+        format!("From OpenCode: {}.", if parts.is_empty() { "nothing new".to_owned() } else { parts.join("; ") });
+    if !import.warnings.is_empty() {
+        text.push(' ');
+        text.push_str(&import.warnings.join(" "));
+    }
+    (text, false)
+}
+
 /// Shown when the install client couldn't be built (TLS setup failed), which has never been seen.
 const HUB_UNAVAILABLE: &str = "Skill installs aren't available: the HTTP client couldn't be set up. The log says why.";
 
@@ -898,7 +969,15 @@ async fn drive(
 
     // A live pool of MCP connections for the agent. Rebuilt (connections dropped, reconnected lazily)
     // only when the enabled server set changes, so connections persist across turns otherwise.
-    let mut hub = McpHub::new(manager.extensions.snapshot().servers);
+    // Stdio MCP servers run under bubblewrap with the project writable and the plugin folders bound.
+    let mcp_launch = recode_extensions::Launch {
+        project: workspace.as_ref().map(|ws| ws.root().to_path_buf()).or_else(|| std::env::current_dir().ok()),
+        home: std::env::var_os("HOME").map(std::path::PathBuf::from),
+        writable: std::fs::read_dir(paths.data_dir.join("plugins"))
+            .map(|entries| entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()).collect())
+            .unwrap_or_default(),
+    };
+    let mut hub = McpHub::with_launch(manager.extensions.snapshot().servers, mcp_launch.clone());
 
     let mut chat = match OllamaProvider::new(&url) {
         Ok(provider) => Chat::new(provider, num_ctx),
@@ -1227,8 +1306,9 @@ async fn drive(
                     manager.probing.push(name.clone());
                     let _ = events.send(UiEvent::Extensions(manager.snapshot()));
                     let sender = probe_results.clone();
+                    let launch = mcp_launch.clone();
                     tokio::spawn(async move {
-                        let result = recode_extensions::probe(&server).await;
+                        let result = recode_extensions::probe_with(&server, &launch).await;
                         let _ = sender.send((name, result));
                     });
                 }
@@ -1571,6 +1651,17 @@ async fn drive(
                     }
                 }
             }
+            UiCommand::Extension(ExtensionCommand::ImportOpenCode) => {
+                let trusted = project_trusted(&manager.places, manager.store.as_ref());
+                let import = recode_extensions::opencode::read(
+                    manager.places.user_config_root.as_deref(),
+                    manager.places.project.as_deref(),
+                    trusted,
+                );
+                let (text, is_error) = summarise_opencode_import(&mut manager.extensions, import);
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text, is_error });
+            }
             UiCommand::Extension(ExtensionCommand::ImportClaudeMcp) => {
                 // Copies Claude Code's servers into re-code's own file, so they stay even if Claude Code changes.
                 let copies = recode_extensions::claude::servers(
@@ -1688,7 +1779,7 @@ async fn drive(
                         // new port each launch, so the address matters, not just the name).
                         let servers = manager.extensions.snapshot().servers;
                         if !hub.matches(&servers) {
-                            hub = McpHub::new(servers);
+                            hub = McpHub::with_launch(servers, mcp_launch.clone());
                         }
                         let hooks = std::sync::Arc::new(load_hooks(&manager, &paths));
                         let mut config = build_agent_config(&manager, &clean, plan_path.clone(), max_steps, hooks);
@@ -6093,6 +6184,7 @@ done
             expose_to_agent: false,
             external: None,
             tools: None,
+            sandbox: recode_core::extensions::McpSandbox::default(),
         };
         let mut hub = McpHub::new(vec![srv]);
 

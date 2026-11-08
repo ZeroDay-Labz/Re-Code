@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 recode-core.workspace = true
+recode-tools.workspace = true
 futures-util.workspace = true
 http.workspace = true
 reqwest.workspace = true

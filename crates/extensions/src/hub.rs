@@ -34,6 +34,7 @@ pub struct Listing {
 
 /// Keeps MCP servers connected for the agent.
 pub struct McpHub {
+    launch: crate::probe::Launch,
     servers: BTreeMap<String, McpServer>,
     clients: HashMap<String, McpClient>,
     listed: HashMap<String, Vec<McpToolInfo>>,
@@ -43,12 +44,18 @@ impl McpHub {
     /// Creates a hub over the enabled, usable servers. Nothing connects until it's used.
     #[must_use]
     pub fn new(servers: Vec<McpServer>) -> Self {
+        Self::with_launch(servers, crate::probe::Launch::from_environment())
+    }
+
+    /// A hub whose stdio servers run in the sandbox set up for `launch` (the project, the plugin folders).
+    #[must_use]
+    pub fn with_launch(servers: Vec<McpServer>, launch: crate::probe::Launch) -> Self {
         let servers = servers
             .into_iter()
             .filter(|server| server.enabled && server.external.as_ref().is_none_or(|e| e.unsupported.is_none()))
             .map(|server| (server.name.clone(), server))
             .collect();
-        Self { servers, clients: HashMap::new(), listed: HashMap::new() }
+        Self { launch, servers, clients: HashMap::new(), listed: HashMap::new() }
     }
 
     /// The names of the known (enabled) servers, sorted.
@@ -79,7 +86,7 @@ impl McpHub {
         // A connection that closed (the server exited, the IDE restarted) is replaced.
         self.clients.remove(name);
         let server = self.servers.get(name).ok_or_else(|| format!("no MCP server called '{name}'"))?.clone();
-        let client = tokio::time::timeout(CONNECT_TIMEOUT, connect(&server))
+        let client = tokio::time::timeout(CONNECT_TIMEOUT, connect(&server, &self.launch))
             .await
             .map_err(|_| format!("{name} didn't answer within {}s", CONNECT_TIMEOUT.as_secs()))??;
         let tools = client

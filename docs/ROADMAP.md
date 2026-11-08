@@ -336,6 +336,13 @@ Done ahead of schedule: Anthropic, OpenAI and Gemini reachable (OpenAI-compatibl
   (X8).
 - **Landed 2026-11-08:** saved chats can be deleted from the Home list and the session picker (`d`, with a
   confirmation; the session writer deletes and re-sends the list; deleting the open chat starts a new one).
+- **Landed 2026-11-08 (X6–X8):** OpenCode import (`crates/extensions/src/opencode.rs`, shape read from the
+  developer's own config; keys never copied), command-line parity (`crates/app/src/cli.rs`: mcp, skill,
+  plugin, memory, trust, untrust; tested end to end against the built binary in
+  `crates/app/tests/cli.rs`), and stdio MCP servers under bubblewrap with a per-server opt-out
+  (`Launch` in `probe.rs`, `McpServer.sandbox`). Not done from X8: cloning other git hosts under bwrap
+  (GitHub remains the only hub source). Also: a stricter "free" rule for OpenRouter and paid models grouped
+  per provider, after the developer hit a per-request-priced music model listed as free.
 - **Landed 2026-11-08 (plugins, track X5):** `crates/extensions/src/plugins.rs`. The Hermes plugin catalog
   (`plugin-catalog.json`, 1,200 entries, shape read live: `entries[{name, repo, sha, subdir?, tier,
   maintainer, capabilities}]` plus `removed[]`, cached 6 h) and Claude Code marketplaces

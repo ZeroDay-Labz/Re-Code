@@ -1795,6 +1795,17 @@ impl App {
             "skills" => tab(self, HomeTab::Skills),
             "plugins" => tab(self, HomeTab::Plugins),
             "web" | "search" => self.run_command(PaletteCommand::WebSearch),
+            "import" => match argument.trim() {
+                "opencode" => vec![Action::Extension(ExtensionCommand::ImportOpenCode)],
+                "claude" | "claude-code" => vec![Action::Extension(ExtensionCommand::ImportClaudeMcp)],
+                _ => {
+                    self.toast(
+                        "/import opencode brings OpenCode's servers and providers; /import claude its MCP servers.",
+                        ToastLevel::Info,
+                    );
+                    Vec::new()
+                }
+            },
             "plugin" => {
                 let mut words = argument.splitn(2, char::is_whitespace);
                 let verb = words.next().unwrap_or_default();
@@ -2666,6 +2677,9 @@ impl App {
             KeyCode::Char('i') if tab == HomeTab::Mcp => {
                 return vec![Action::Extension(ExtensionCommand::ImportClaudeMcp)];
             }
+            KeyCode::Char('o') if tab == HomeTab::Mcp || tab == HomeTab::Providers => {
+                return vec![Action::Extension(ExtensionCommand::ImportOpenCode)];
+            }
             KeyCode::Char('i') if tab == HomeTab::Skills => return self.open_install(None),
             KeyCode::Char('s') if tab == HomeTab::Skills => return self.open_skill_search(None),
             KeyCode::Char('u') if tab == HomeTab::Skills => return self.update_selected_skill(),
@@ -3203,12 +3217,17 @@ impl App {
         let command = ExtensionCommand::TestServer(server.name.clone());
         if matches!(server.transport, McpTransport::Stdio { .. }) {
             // A local server is a program, so nothing starts without seeing exactly what it runs.
+            let where_it_runs = match server.sandbox {
+                recode_core::extensions::McpSandbox::Bubblewrap => {
+                    "This runs the following program in the bubblewrap sandbox (project writable, home emptied, secrets hidden; on the host only if bubblewrap is missing):"
+                }
+                recode_core::extensions::McpSandbox::None => {
+                    "This runs the following program on your computer, outside any sandbox:"
+                }
+            };
             self.overlay = Some(Overlay::Confirm(ConfirmState {
                 title: format!("Test {}?", server.name),
-                body: vec![
-                    "This runs the following program on your computer, outside any sandbox:".to_owned(),
-                    server.connection_text(),
-                ],
+                body: vec![where_it_runs.to_owned(), server.connection_text()],
                 command: command.into(),
             }));
             return Vec::new();

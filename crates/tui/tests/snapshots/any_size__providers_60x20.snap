@@ -21,4 +21,4 @@ expression: "screen(&draw(app, width, height))"
  │                                                        │
  │                                                        │
  ╰────────────────────────────────────────────────────────╯
-   a add  p preset  t test  e edit  space on/off  d delete
+  a add  p preset  o opencode  t test  e edit  space on/off

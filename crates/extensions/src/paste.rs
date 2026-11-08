@@ -162,6 +162,7 @@ fn from_entry(entry: &serde_json::Map<String, Value>) -> Result<McpServer, Strin
             expose_to_agent: false,
             external: None,
             tools: None,
+            sandbox: recode_core::extensions::McpSandbox::default(),
         });
     }
     let command_value = entry.get("command").ok_or("has neither a command nor a url")?;
@@ -189,6 +190,7 @@ fn from_entry(entry: &serde_json::Map<String, Value>) -> Result<McpServer, Strin
         expose_to_agent: false,
         external: None,
         tools: None,
+        sandbox: recode_core::extensions::McpSandbox::default(),
     })
 }
 
@@ -203,6 +205,7 @@ pub fn from_command_line(name: Option<&str>, line: &str) -> Result<McpServer, St
         expose_to_agent: false,
         external: None,
         tools: None,
+        sandbox: recode_core::extensions::McpSandbox::default(),
     };
     let derived = name.map(str::to_owned).unwrap_or_else(|| package_name(command, args));
     server.name = derive_name(&derived, &server);
@@ -254,6 +257,7 @@ fn derive_name(raw: &str, server: &McpServer) -> String {
                 expose_to_agent: false,
                 external: None,
                 tools: None,
+                sandbox: recode_core::extensions::McpSandbox::default(),
             },
         ),
         McpTransport::Http { .. } => "server".to_owned(),
