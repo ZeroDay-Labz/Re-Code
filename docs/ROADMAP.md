@@ -336,6 +336,15 @@ Done ahead of schedule: Anthropic, OpenAI and Gemini reachable (OpenAI-compatibl
   (X8).
 - **Landed 2026-11-08:** saved chats can be deleted from the Home list and the session picker (`d`, with a
   confirmation; the session writer deletes and re-sends the list; deleting the open chat starts a new one).
+- **Landed 2026-11-08 (production P1, P2, P4; live cloud L):** crash files and `doctor --report`
+  (`crates/app/src/crash.rs`), `--version` with commit and date (`build.rs`), a week of logs, GitHub Actions
+  CI (gate on Ubuntu, rpm in a Fedora 44 container, deb on Ubuntu 22.04 for an old glibc) and a tag-driven
+  release workflow that publishes both packages with checksums and the changelog section. The first live
+  cloud verification: `crates/providers/tests/live_cloud.rs` on Gemini 3.8 Flash did a chat, a tool call and
+  the round trip, after fixing the adapter to echo Gemini's `thought_signature` (`ToolCall.extra`). Not
+  reached live: OpenRouter's free quota was spent for the day, Groq is blocked from this network, Ollama
+  Cloud wants credits, Hugging Face's included credits were spent; the Anthropic test exists and costs
+  money to run. Still open from production: COPR (P3) and Flatpak (P5).
 - **Landed 2026-11-08 (X6–X8):** OpenCode import (`crates/extensions/src/opencode.rs`, shape read from the
   developer's own config; keys never copied), command-line parity (`crates/app/src/cli.rs`: mcp, skill,
   plugin, memory, trust, untrust; tested end to end against the built binary in
