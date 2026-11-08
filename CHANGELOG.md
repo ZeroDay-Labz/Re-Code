@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+### Fixed
+
+- Piping the command line's output into `head` wrote a crash file ("failed printing to stdout: Broken
+  pipe"); a closed pipe now ends the process quietly with exit code 141, as a pipe death does for other
+  tools.
+
 ## [0.1.5] - 2026-11-08
 
 ### Added

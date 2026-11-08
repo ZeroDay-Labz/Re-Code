@@ -44,6 +44,11 @@ pub fn install_hook(paths: &Paths) {
             .map(|s| (*s).to_owned())
             .or_else(|| info.payload().downcast_ref::<String>().cloned())
             .unwrap_or_else(|| "(no message)".to_owned());
+        // Rust ignores SIGPIPE, so `re-code skill list | head` ends in a print panic when head closes
+        // the pipe. That's not a crash: leave quietly with the exit code a SIGPIPE death would give.
+        if message.contains("Broken pipe") {
+            std::process::exit(141);
+        }
         let location = info.location().map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column())).unwrap_or_default();
         let text = format!(
             "re-code crashed.\n\nversion: {}\nsystem:  {}\nwhere:   {location}\nmessage: {message}\n\nThis file holds no prompts, replies or file contents. Please attach it to a bug report at\nhttps://github.com/ZeroDay-Labz/Re-Code/issues.\n",
