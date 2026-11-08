@@ -43,7 +43,7 @@ async fn round_trip(provider: &dyn Provider, model: &str) {
         .collect();
     assert!(text.to_uppercase().contains("OK"), "plain chat: {events:?}");
     let usage = events.iter().find_map(|e| match e {
-        Ok(StreamEvent::Finished { usage, .. }) => usage.clone(),
+        Ok(StreamEvent::Usage(usage)) => Some(usage.clone()),
         _ => None,
     });
     eprintln!("chat ok on {model}; reported usage: {usage:?}");
@@ -69,11 +69,12 @@ async fn round_trip(provider: &dyn Provider, model: &str) {
     // The round trip: the assistant's call and our result go back, and the model answers in words.
     let mut messages = vec![
         Message::user("Use the read tool to read src/main.rs, then tell me in one short sentence what the file does."),
-        Message::assistant_tool_calls(vec![call.clone()]),
-        Message::tool_result(&call.id, "fn main() { println!(\"hello from re-code\"); }"),
+        Message::assistant("", vec![call.clone()]),
+        Message::tool_result(&call, "fn main() { println!(\"hello from re-code\"); }"),
     ];
     messages.retain(|m| m.role != Role::System);
-    let request = ChatRequest { model: model.to_owned(), messages, tools: vec![read_tool()], options: ProviderOptions::None };
+    let request =
+        ChatRequest { model: model.to_owned(), messages, tools: vec![read_tool()], options: ProviderOptions::None };
     let events: Vec<_> = provider.stream(request, CancellationToken::new()).collect().await;
     let answer: String = events
         .iter()
@@ -82,7 +83,10 @@ async fn round_trip(provider: &dyn Provider, model: &str) {
             _ => None,
         })
         .collect();
-    assert!(answer.to_lowercase().contains("hello") || answer.to_lowercase().contains("print"), "round trip: {events:?}");
+    assert!(
+        answer.to_lowercase().contains("hello") || answer.to_lowercase().contains("print"),
+        "round trip: {events:?}"
+    );
     eprintln!("round trip ok: {}", answer.trim());
 }
 
@@ -104,6 +108,7 @@ async fn anthropic_chats_calls_a_tool_and_takes_the_result_back() {
     let (Some(key), Some(model)) = (var("RE_CODE_TEST_ANTHROPIC_KEY"), var("RE_CODE_TEST_ANTHROPIC_MODEL")) else {
         panic!("set RE_CODE_TEST_ANTHROPIC_KEY and RE_CODE_TEST_ANTHROPIC_MODEL");
     };
-    let provider = AnthropicProvider::new(&key).unwrap();
+    let base = var("RE_CODE_TEST_ANTHROPIC_BASE").unwrap_or_else(|| "https://api.anthropic.com".to_owned());
+    let provider = AnthropicProvider::new(&base, &key).unwrap();
     round_trip(&provider, &model).await;
 }

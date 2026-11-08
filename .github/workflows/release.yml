@@ -23,7 +23,7 @@ jobs:
         with:
           tool: cargo-generate-rpm
       - run: cargo build --release
-      - run: cargo generate-rpm -p crates/app -o dist/
+      - run: cargo generate-rpm -p crates/app && mkdir -p dist && cp target/generate-rpm/*.rpm dist/
       - uses: actions/upload-artifact@v4
         with:
           name: rpm
