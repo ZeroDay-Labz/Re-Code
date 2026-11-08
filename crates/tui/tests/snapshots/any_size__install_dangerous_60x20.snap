@@ -19,6 +19,5 @@ expression: "screen(&draw(app, width, height))"
 │ Keep it, off?                                            │
 │ k keep off  o enable on my word  n discard               │
 ╰──────────────────────────────────────────────────────────╯
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+  ╰──────────────────────────────────────────────────────╯
  a add  i install  e edit  space on/off  d delete  s browse

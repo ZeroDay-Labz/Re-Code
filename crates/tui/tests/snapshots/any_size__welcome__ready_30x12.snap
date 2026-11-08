@@ -4,13 +4,13 @@ expression: "screen(&draw(app, width, height))"
 ---
            ◆ re-code
 
-  Home │ Models 5 │ Runtimes
- / type to filter
+   Home │ Models 5 │
+  / type to filter
 
- ❯ ● gpt-oss:20b
-   ● llama3.2:3b
-   · a-very-long-model-name-…
-   ◐ qwen3.6:27b-coding
-   ● deephat:7b-q4
+  ❯ ● gpt-oss:20b
+    ● llama3.2:3b
+    · a-very-long-model-nam…
+    ◐ qwen3.6:27b-coding
+    ● deephat:7b-q4
 
  enter start  ↑↓ choose  k key

@@ -2275,6 +2275,70 @@ fn installing_a_skill_shows_the_preview_and_takes_the_decision() {
 }
 
 #[test]
+fn the_home_screen_fits_the_terminal_and_details_can_be_read_in_full() {
+    // By default the body uses the terminal's width and height: at 160×45 the panel is wider than the
+    // old 116-column cap and taller than 24 rows.
+    let mut app = home_on(HomeTab::Skills, sample_extensions());
+    let text = screen(&draw(&mut app, 160, 45));
+    let panel_top = text.lines().find(|line| line.contains("╭ Skills")).expect("a panel");
+    assert!(panel_top.trim().chars().count() >= 150, "{panel_top}");
+    let body_rows = text.lines().filter(|line| line.trim_start().starts_with('│')).count();
+    assert!(body_rows > 24, "{body_rows} rows\n{text}");
+    // The detail pane takes a third of the list by default; "half" gives it more.
+    let rule_at = |text: &str| {
+        text.lines().find(|line| line.contains("❯ ● review")).and_then(|line| line.find(" │ ")).unwrap_or(0)
+    };
+    let narrow = rule_at(&text);
+    app.settings.insert("detail_pane".to_owned(), "half".to_owned());
+    let half = rule_at(&screen(&draw(&mut app, 160, 45)));
+    assert!(narrow > half && half > 0, "narrow {narrow} vs half {half}");
+    // "A column" keeps the composed 116-wide, 24-row screen.
+    app.settings.insert("home_layout".to_owned(), "column".to_owned());
+    let text = screen(&draw(&mut app, 160, 45));
+    let panel_top = text.lines().find(|line| line.contains("╭ Skills")).expect("a panel");
+    assert!(panel_top.trim().chars().count() <= 118, "{panel_top}");
+
+    // The Settings tab has both rows; Enter toggles the layout, ←/→ cycle the pane.
+    let mut app = home_on(HomeTab::Settings, sample_extensions());
+    let text = screen(&draw(&mut app, 120, 40));
+    assert!(
+        text.contains("Home screen") && text.contains("fits the terminal") && text.contains("Detail pane"),
+        "{text}"
+    );
+    let rows = recode_tui::home::settings_rows(&app);
+    let layout = rows.iter().position(|row| row.label == "Home screen").unwrap();
+    for _ in 0..layout {
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    }
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::SetSetting { key, value }] if key == "home_layout" && value == "column"),
+        "{actions:?}"
+    );
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::SetSetting { key, value }] if key == "detail_pane" && value == "half"),
+        "{actions:?}"
+    );
+
+    // v on a row opens everything the detail pane says in the pager, titled after the row.
+    let mut app = home_on(HomeTab::Skills, sample_extensions());
+    app.handle_key(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+    assert!(
+        matches!(&app.overlay, Some(recode_tui::app::Overlay::Pager { title, text, .. }) if title == "About review" && text.contains("Press e to edit it")),
+        "{:?}",
+        app.overlay.is_some()
+    );
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("About review"), "{text}");
+    // And on the Models tab, when nothing is being typed into the filter.
+    let mut app = home_on(HomeTab::Models, sample_extensions());
+    app.handle_key(KeyEvent::new(KeyCode::Char('v'), KeyModifiers::NONE));
+    assert!(matches!(&app.overlay, Some(recode_tui::app::Overlay::Pager { title, .. }) if title.starts_with("About ")));
+}
+
+#[test]
 fn flagged_skills_are_marked_and_trust_asks_before_enabling_project_skills() {
     use recode_tui::app::Action;
     let mut app = home_on(HomeTab::Skills, flagged_skills());

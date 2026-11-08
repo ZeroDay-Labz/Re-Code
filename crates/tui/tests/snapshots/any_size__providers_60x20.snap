@@ -4,21 +4,20 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
- ╭ Model providers ───────────────────────────────────────╮
- │❯ ✗ anthropic                          Anthropic  failed│
- │  ● openrouter    OpenAI-compatible  320 models  60 free│
- │  ○ off-provider                             OpenAI  off│
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+  ╭ Model providers ─────────────────────────────────────╮
+  │❯ ✗ anthropic                        Anthropic  failed│
+  │  ● openrouter  OpenAI-compatible  320 models  60 free│
+  │  ○ off-provider                           OpenAI  off│
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
   a add  p preset  o opencode  t test  e edit  space on/off

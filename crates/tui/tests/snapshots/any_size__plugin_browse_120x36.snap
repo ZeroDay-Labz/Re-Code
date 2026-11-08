@@ -2,7 +2,6 @@
 source: crates/tui/tests/any_size.rs
 expression: "screen(&draw(app, width, height))"
 ---
-
                                             █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
                                             █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
@@ -12,27 +11,29 @@ expression: "screen(&draw(app, width, height))"
   ╭ Plugins and marketplaces ────────────────────────────────────────────────────────────────────────────────────────╮
   │❯ ● context7           claude-plugins-official @ 2c5958ec · 2 parts │ context7                                    │
   │  ◌ better-session-appea…  community @ 3ee27002 · nothing runs here │ Upstash Context7 MCP server for up-to-date  │
-  │  ⌂ claud╭ Marketplace claude-plugins-official ─────────────────────────────────────────────────────────╮         │
-  │  ◇ rust-│ Filter  ▏   3 of 3                                                                           │pinned @ │
-  │         │ Category  all 3 · tools 2 · desktop 1                                                        │         │
-  │         │                                                                                              │k (not   │
+  │  ⌂ claude-plugins-official               marketplace · 317 plugins │ documentation lookup.                       │
+  │  ◇ rust-╭ Marketplace claude-plugins-official ─────────────────────────────────────────────────────────╮pinned @ │
+  │         │ Filter  ▏   3 of 3                                                                           │         │
+  │         │ Category  all 3 · tools 2 · desktop 1                                                        │k (not   │
+  │         │                                                                                              │         │
   │         │ ❯ [ ] context7   development                                                                 │         │
   │         │         Upstash Context7 MCP server for documentation lookup.                                │         │
   │         │   [ ] frontend-design  1.1.1   development                                                   │         │
   │         │         Frontend design skill for UI/UX implementation                                       │         │
   │         │       npm-thing   tools                                                                      │         │
-  │         │         can't be installed: this source runs code on install, which re-code never does       │         │
-  │         │                                                                                              │, not    │
-  │         │ enter install  tab tick  ^a all shown  ←→ category  esc cancel                               │         │
-  │         │                                                                                              │ted.toml │
+  │         │         can't be installed: this source runs code on install, which re-code never does       │, not    │
+  │         │                                                                                              │         │
+  │         │ enter install  tab tick  ^a all shown  ←→ category  esc cancel                               │ted.toml │
   │         │                                                                                              │nt into  │
+  │         │                                                                                              │         │
   │         ╰──────────────────────────────────────────────────────────────────────────────────────────────╯         │
-  │                                                                    │                                             │
   │                                                                    │ /home/someone/.local/share/re-code/plugins/c│
   │                                                                    │ ontext7                                     │
   │                                                                    │ Space switches it on or off, u checks for   │
   │                                                                    │ an update, d removes it.                    │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
   GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
   Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
-      i install  b browse  s search  m marketplace  space on/off  u update  d remove  tab next  ^R rescan  ^C quit
+i install  b browse  s search  m marketplace  space on/off  u update  d remove  v read all  tab next  ^R rescan  ^C quit

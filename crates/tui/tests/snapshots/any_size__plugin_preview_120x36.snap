@@ -2,7 +2,6 @@
 source: crates/tui/tests/any_size.rs
 expression: "screen(&draw(app, width, height))"
 ---
-
                                             █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
                                             █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
@@ -13,26 +12,28 @@ expression: "screen(&draw(app, width, height))"
   │❯ ● context7           claude-plugins-official @ 2c5958ec · 2 parts │ context7                                    │
   │  ◌ better-session-appea…  community @ 3ee27002 · nothing runs here │ Upstash Context7 MCP server for up-to-date  │
   │  ⌂ claude-plugins-official               marketplace · 317 plugins │ documentation lookup.                       │
-  │  ◇ rust-analyz╭ Install a plugin ────────────────────────────────────────────────────────────────╮cial] pinned @ │
-  │               │ better-session-appearance   community   pinned @ 3ee27002                        │ash            │
-  │               │ maintained by apoapostolov                                                       │ 1 hook (not   │
+  │  ◇ rust-analyzer-lsp@claude-plugi…  installed in Claude Code 1.0.0 │ context7 [claude-plugins-official] pinned @ │
+  │               ╭ Install a plugin ────────────────────────────────────────────────────────────────╮ash            │
+  │               │ better-session-appearance   community   pinned @ 3ee27002                        │ 1 hook (not   │
+  │               │ maintained by apoapostolov                                                       │               │
   │               │ Set a color for each session and show an idle glyph.                             │               │
   │               │ 2 parts that don't run here; nothing here runs in re-code · 8 files · 1.4 MB ·   │               │
   │               │ version 1.2.4                                                                    │               │
   │               │ · Python plugin code (tools, hooks or middleware for Hermes Agent) · not run     │               │
   │               │ here                                                                             │               │
-  │               │ · desktop plugin (Hermes app interface) · not run here                           │               │
-  │               │ Location  /home/someone/.local/share/re-code/plugins/better-session-appearance   │verted, not    │
-  │               │                                                                                  │               │
-  │               │ Enable now?                                                                      │converted.toml │
-  │               │ y yes  k keep off  n discard                                                     │you want into  │
+  │               │ · desktop plugin (Hermes app interface) · not run here                           │verted, not    │
+  │               │ Location  /home/someone/.local/share/re-code/plugins/better-session-appearance   │               │
+  │               │                                                                                  │converted.toml │
+  │               │ Enable now?                                                                      │you want into  │
+  │               │ y yes  k keep off  n discard                                                     │               │
   │               ╰──────────────────────────────────────────────────────────────────────────────────╯               │
-  │                                                                    │                                             │
   │                                                                    │ /home/someone/.local/share/re-code/plugins/c│
   │                                                                    │ ontext7                                     │
   │                                                                    │ Space switches it on or off, u checks for   │
   │                                                                    │ an update, d removes it.                    │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
   GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
   Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
-      i install  b browse  s search  m marketplace  space on/off  u update  d remove  tab next  ^R rescan  ^C quit
+i install  b browse  s search  m marketplace  space on/off  u update  d remove  v read all  tab next  ^R rescan  ^C quit

@@ -4,13 +4,13 @@ expression: "screen(&draw(app, width, height))"
 ---
            ◆ re-code
 
-  Home │ Models 2 │ Runtimes
- Ollama is installed but
- stopped
+   Home │ Models 2 │
+  Ollama is installed but
+  stopped
 
- / type to filter
- ❯ ★ openrouter/free-coder
-   ☁ gpt-5-mini
+  / type to filter
+  ❯ ★ openrouter/free-coder
+    ☁ gpt-5-mini
 
 
  enter start  ↑↓ choose  k key

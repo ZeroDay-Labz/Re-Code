@@ -2350,6 +2350,15 @@ impl App {
                 let current = self.settings.get("memory").cloned().unwrap_or_else(|| "on".to_owned());
                 self.set_setting("memory", cycle(&crate::home::MEMORY_CHOICES, &current, step))
             }
+            SettingKind::HomeLayout if step != 0 => {
+                let column = self.settings.get("home_layout").is_some_and(|v| v == "column");
+                self.set_setting("home_layout", if column { "fit".to_owned() } else { "column".to_owned() })
+            }
+            SettingKind::DetailPane if step != 0 => {
+                let current = self.settings.get("detail_pane").cloned().unwrap_or_else(|| "narrow".to_owned());
+                let next = cycle(&["narrow", "half", "wide"], &current, step);
+                self.set_setting("detail_pane", next)
+            }
             SettingKind::LineNumbers if step != 0 => {
                 let on = self.settings.get("line_numbers").is_some_and(|v| v == "on");
                 self.set_setting("line_numbers", if on { "off".to_owned() } else { "on".to_owned() })
@@ -2573,6 +2582,14 @@ impl App {
             KeyCode::Char('v') if ctrl => welcome.toggle(|only| &mut only.vision, self.welcome_info.as_ref()),
             KeyCode::Char('p') if ctrl => welcome.by_provider = !welcome.by_provider,
             KeyCode::Char('k') if !ctrl && welcome.filter.is_empty() => return self.key_for_selected(),
+            KeyCode::Char('v') if !ctrl && welcome.filter.is_empty() => {
+                // Everything the detail pane says, with room to read it.
+                if let (Some(model), Some(info)) = (self.selected_model(), self.welcome_info.as_ref()) {
+                    let lines = crate::welcome::model_detail_lines(model, info.free_vram_gib, 100_000);
+                    let title = format!("About {}", model.name);
+                    self.open_pager(title, crate::extensions_view::plain_text(&lines));
+                }
+            }
             KeyCode::Char(c) if !ctrl => {
                 let filter = format!("{}{c}", welcome.filter);
                 welcome.set_filter(filter, self.welcome_info.as_ref());
@@ -2728,6 +2745,7 @@ impl App {
                 }
             }
             KeyCode::Char('a') => self.overlay = Some(Overlay::Form(FormState::new_for(tab))),
+            KeyCode::Char('v') => self.view_selected(),
             KeyCode::Char('e') | KeyCode::Enter => return self.edit_selected(),
             KeyCode::Char('d') => self.confirm_delete(),
             KeyCode::Char(' ') => return self.toggle_selected(),
@@ -2791,6 +2809,18 @@ impl App {
         let extensions = self.extensions.as_ref()?;
         let index = welcome.extension_index(self.extension_count());
         Some((welcome.tab, index, extensions))
+    }
+
+    /// `v` on an extension tab: the selected row's details in the pager, with room to read them.
+    fn view_selected(&mut self) {
+        let Some((tab, index, extensions)) = self.selected_extension() else { return };
+        let Some(lines) = crate::extensions_view::detail_lines(tab, index, extensions, 100_000) else { return };
+        let title = lines
+            .first()
+            .map(|line| line.spans.iter().map(|span| span.content.as_ref()).collect::<String>())
+            .filter(|name| !name.trim().is_empty())
+            .map_or_else(|| "Details".to_owned(), |name| format!("About {}", name.trim()));
+        self.open_pager(title, crate::extensions_view::plain_text(&lines));
     }
 
     /// `u` on the Skills tab: check the selected installed skill for a newer version.

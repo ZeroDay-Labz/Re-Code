@@ -4,8 +4,8 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
- ╭ Skills ────────────────────────────────────────────────╮
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+  ╭ Skills ──────────────────────────────────────────────╮
 ╭ Install a skill ─────────────────────────────────────────╮
 │ godmode   official   pinned @ 4134cbef                   │
 │ Run security tooling with every safeguard explained.     │
@@ -18,7 +18,6 @@ expression: "screen(&draw(app, width, height))"
 │ Enable now?                                              │
 │ y yes  k keep off  n discard  r read SKILL.md            │
 ╰──────────────────────────────────────────────────────────╯
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
  a add  i install  e edit  space on/off  d delete  s browse

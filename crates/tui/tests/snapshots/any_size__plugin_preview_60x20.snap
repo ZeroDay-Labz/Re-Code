@@ -4,7 +4,7 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
 ╭ Install a plugin ────────────────────────────────────────╮
 │ better-session-appearance   community   pinned @ 3ee27002
 │ maintained by apoapostolov                               │
@@ -19,6 +19,5 @@ expression: "screen(&draw(app, width, height))"
 │ Enable now?                                              │
 │ y yes  k keep off  n discard                             │
 ╰──────────────────────────────────────────────────────────╯
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+  ╰──────────────────────────────────────────────────────╯
  i install  b browse  s search  m marketplace  space on/off

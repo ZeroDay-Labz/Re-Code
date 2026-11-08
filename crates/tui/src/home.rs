@@ -188,6 +188,10 @@ pub enum SettingKind {
     IdleCompaction,
     Notifications,
     LineNumbers,
+    /// Whether the home screen fills the terminal or stays a composed column.
+    HomeLayout,
+    /// How much of a list's width the detail pane beside it takes.
+    DetailPane,
     /// Whether re-code keeps memory between sessions.
     Memory,
     /// An API key for this provider (preset name), and whether one is stored.
@@ -257,6 +261,25 @@ pub fn settings_rows(app: &App) -> Vec<SettingRow> {
             value: setting("line_numbers", "off"),
             hint: "enter toggles",
             kind: SettingKind::LineNumbers,
+        },
+        SettingRow {
+            label: "Home screen",
+            value: match setting("home_layout", "fit").as_str() {
+                "column" => "a column (116 wide, 24 rows)".to_owned(),
+                _ => "fits the terminal".to_owned(),
+            },
+            hint: "enter toggles: fill the window, or keep a composed column on huge terminals",
+            kind: SettingKind::HomeLayout,
+        },
+        SettingRow {
+            label: "Detail pane",
+            value: match setting("detail_pane", "narrow").as_str() {
+                "half" => "half of the list".to_owned(),
+                "wide" => "three fifths of the list".to_owned(),
+                _ => "a third of the list".to_owned(),
+            },
+            hint: "← → changes how much room the details beside a list get; v reads them in full",
+            kind: SettingKind::DetailPane,
         },
     ];
     // With a model active, its own window replaces the default row, and compaction becomes tunable.

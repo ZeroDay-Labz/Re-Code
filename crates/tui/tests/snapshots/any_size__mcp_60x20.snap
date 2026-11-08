@@ -4,21 +4,20 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
- ╭ MCP servers ───────────────────────────────────────────╮
- │❯ ● rustrover                             http  40 tools│
- │  ✗ broken                                 stdio  failed│
- │  ◐ a-server-with-a-very-long-nam…  stdio  starts on use│
- │  ○ off                                       stdio  off│
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+  ╭ MCP servers ─────────────────────────────────────────╮
+  │❯ ● rustrover                           http  40 tools│
+  │  ✗ broken                               stdio  failed│
+  │  ◐ a-server-with-a-very-long-n…  stdio  starts on use│
+  │  ○ off                                     stdio  off│
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
 a add  p preset  s search  f tools  t test  i import  e edit

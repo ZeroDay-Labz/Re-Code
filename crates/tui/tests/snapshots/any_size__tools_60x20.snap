@@ -4,21 +4,20 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
- ╭ Custom tools ──────────────────────────────────────────╮
- │❯ ● search-docs                              1 parameter│
- │  ○ off-tool                               no parameters│
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
- a add  e edit  space on/off  d delete  tab next  ^R rescan
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+  ╭ Custom tools ────────────────────────────────────────╮
+  │❯ ● search-docs                            1 parameter│
+  │  ○ off-tool                             no parameters│
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
+ a add  e edit  space on/off  d delete  v read all  tab next

@@ -17,9 +17,29 @@ const LOGO: [&str; 3] =
     ["█▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀", "█▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀ ", "█  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄"];
 const TAGLINE: &str = "a coding agent for your own machine";
 const INTRO: Duration = Duration::from_millis(1400);
-/// The content column stops growing here, so the screen stays composed on huge terminals.
+/// The content column stops growing here when the layout is "a column"; "fit" uses the terminal.
 const COLUMN: u16 = 116;
+/// The narrowest useful detail pane; wider terminals get a share of the width (the Settings tab says how much).
 const DETAILS_WIDTH: u16 = 38;
+
+/// Whether the home screen fills the terminal (the default) or stays a composed column.
+#[must_use]
+pub fn home_fits(app: &App) -> bool {
+    app.settings.get("home_layout").is_none_or(|v| v != "column")
+}
+
+/// How wide the detail pane is beside a list `total` columns wide: a third, half or three fifths, as
+/// the Settings tab says, never narrower than `least` (the tab's old fixed pane) and always leaving the
+/// list 30 columns.
+#[must_use]
+pub fn detail_width(total: u16, least: u16, app: &App) -> u16 {
+    let share = match app.settings.get("detail_pane").map(String::as_str) {
+        Some("half") => total / 2,
+        Some("wide") => total * 3 / 5,
+        _ => total / 3,
+    };
+    share.max(least).min(total.saturating_sub(33))
+}
 const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /// The home screen's tabs.
@@ -498,6 +518,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 let by_provider = matches!(&app.screen, Screen::Welcome(welcome) if welcome.by_provider);
                 items.push(("^P", if by_provider { "provider ●" } else { "provider ○" }));
                 items.push(("k", "key"));
+                items.push(("v", "read all"));
             }
         }
         HomeTab::Providers => {
@@ -509,6 +530,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 ("e", "edit"),
                 ("space", "on/off"),
                 ("d", "delete"),
+                ("v", "read all"),
             ]);
         }
         HomeTab::Mcp => {
@@ -524,6 +546,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 ("space", "on/off"),
                 ("x", "expose"),
                 ("d", "delete"),
+                ("v", "read all"),
             ]);
         }
         HomeTab::Skills => {
@@ -535,6 +558,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 ("d", "delete"),
                 ("s", "browse"),
                 ("u", "update"),
+                ("v", "read all"),
             ]);
         }
         HomeTab::Plugins => {
@@ -546,10 +570,11 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 ("space", "on/off"),
                 ("u", "update"),
                 ("d", "remove"),
+                ("v", "read all"),
             ]);
         }
         HomeTab::Tools => {
-            items.extend([("a", "add"), ("e", "edit"), ("space", "on/off"), ("d", "delete")]);
+            items.extend([("a", "add"), ("e", "edit"), ("space", "on/off"), ("d", "delete"), ("v", "read all")]);
         }
     }
     items.push(("tab", "next"));
@@ -586,12 +611,14 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let tabs_rows: u16 = u16::from(area.height >= 7 && area.width >= 26);
     let chrome = logo_rows + tabs_rows + meters + 1;
     let room = area.height.saturating_sub(chrome);
-    // Very tall terminals get a composed screen, not a list stretched across all of it.
-    let body_rows = room.min(24);
+    let fit = home_fits(app);
+    // "Fit" uses the terminal; "a column" keeps a composed screen on huge terminals.
+    let body_rows = if fit { room.saturating_sub(u16::from(room > 8)) } else { room.min(24) };
 
     let total = chrome + body_rows;
     let mut y = area.y + area.height.saturating_sub(total) / 2;
-    let column_width = area.width.saturating_sub(2).clamp(1, COLUMN);
+    let column_width =
+        if fit { area.width.saturating_sub(4).max(1) } else { area.width.saturating_sub(2).clamp(1, COLUMN) };
     let column_x = area.x + (area.width - column_width) / 2;
 
     if logo_rows == 5 {
@@ -739,8 +766,9 @@ fn draw_models(
     };
     let show_details = inner.width >= DETAILS_WIDTH + 40 && inner.height >= 8;
     let (list_area, details_area) = if show_details {
-        let list = Rect::new(inner.x, inner.y, inner.width - DETAILS_WIDTH - 3, inner.height);
-        let details = Rect::new(list.x + list.width + 3, inner.y, DETAILS_WIDTH, inner.height);
+        let pane = detail_width(inner.width, DETAILS_WIDTH, app);
+        let list = Rect::new(inner.x, inner.y, inner.width - pane - 3, inner.height);
+        let details = Rect::new(list.x + list.width + 3, inner.y, pane, inner.height);
         (list, Some(details))
     } else {
         (inner, None)
@@ -926,7 +954,13 @@ fn model_row(model: &WelcomeModel, selected: bool, width: usize, current: bool) 
 }
 
 fn draw_details(frame: &mut Frame<'_>, area: Rect, model: &WelcomeModel, free_vram: Option<f64>) {
-    let width = usize::from(area.width);
+    let lines = model_detail_lines(model, free_vram, usize::from(area.width));
+    frame.render_widget(Paragraph::new(lines), area);
+}
+
+/// Everything the detail pane says about a model, wrapped to `width`; `v` reads it in the pager.
+#[must_use]
+pub fn model_detail_lines(model: &WelcomeModel, free_vram: Option<f64>, width: usize) -> Vec<Line<'static>> {
     let mut lines = wrap_plain(&model.name, Style::new().add_modifier(Modifier::BOLD), width);
     let facts: Vec<String> =
         [model.family.clone(), model.parameters.clone(), model.quantization.clone()].into_iter().flatten().collect();
@@ -1047,7 +1081,7 @@ fn draw_details(frame: &mut Frame<'_>, area: Rect, model: &WelcomeModel, free_vr
     if model.loaded {
         lines.extend(wrap_plain("Loaded in memory right now.", Style::new().fg(color(Token::Success)), width));
     }
-    frame.render_widget(Paragraph::new(lines), area);
+    lines
 }
 
 #[cfg(test)]

@@ -2,7 +2,6 @@
 source: crates/tui/tests/any_size.rs
 expression: "screen(&draw(app, width, height))"
 ---
-
                                             █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
                                             █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
@@ -11,16 +10,17 @@ expression: "screen(&draw(app, width, height))"
    Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Plugins 2 │ Tools 2 │ Settings │
   ╭ Skills ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
   │❯ ● review                                                    yours │ review                                      │
-  │  ○ from-rep╭ Install a skill ───────────────────────────────────────────────────────────────────────╮ing,        │
-  │  ● borrowed│ anthropics/skills holds 5 skills. Which ones?                                          │            │
-  │  ✗ damaged │                                                                                        │            │
-  │            │ ❯ [ ] pdf                                                                              │            │
-  │            │         Work with pdf files, from reading to creating them.  ·  skills/pdf             │stimated).  │
-  │            │   [ ] xlsx                                                                             │ills/review/│
+  │  ○ from-repo                                               project │ Use this when something needs doing,        │
+  │  ● borrowed╭ Install a skill ───────────────────────────────────────────────────────────────────────╮            │
+  │  ✗ damaged │ anthropics/skills holds 5 skills. Which ones?                                          │            │
+  │            │                                                                                        │            │
+  │            │ ❯ [ ] pdf                                                                              │stimated).  │
+  │            │         Work with pdf files, from reading to creating them.  ·  skills/pdf             │ills/review/│
+  │            │   [ ] xlsx                                                                             │            │
   │            │         Work with xlsx files, from reading to creating them.  ·  skills/xlsx           │            │
-  │            │   [ ] docx                                                                             │            │
-  │            │         Work with docx files, from reading to creating them.  ·  skills/docx           │hen you're  │
-  │            │   [ ] pptx                                                                             │th Ctrl+L.  │
+  │            │   [ ] docx                                                                             │hen you're  │
+  │            │         Work with docx files, from reading to creating them.  ·  skills/docx           │th Ctrl+L.  │
+  │            │   [ ] pptx                                                                             │            │
   │            │         Work with pptx files, from reading to creating them.  ·  skills/pptx           │            │
   │            │   [ ] frontend-design                                                                  │            │
   │            │         Work with frontend-design files, from reading to creating them.  ·  skills/fr… │            │
@@ -32,7 +32,8 @@ expression: "screen(&draw(app, width, height))"
   │                                                                    │                                             │
   │                                                                    │                                             │
   │                                                                    │                                             │
+  │                                                                    │                                             │
   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
   GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
   Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
-           a add  i install  e edit  space on/off  d delete  s browse  u update  tab next  ^R rescan  ^C quit
+     a add  i install  e edit  space on/off  d delete  s browse  u update  v read all  tab next  ^R rescan  ^C quit

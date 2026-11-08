@@ -4,21 +4,20 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
- ╭ Settings ──────────────────────────────────────────────╮
- │Appearance and behaviour ────────────────────────────── │
- │❯ Theme                                      Driftwave  │
- │  Variant                                       normal  │
- │  Accent                                   theme's own  │
- │  Theme background                    off (terminal's)  │
- │  Context size (local models)             16384 tokens  │
- │  Idle compaction                                  off  │
- │  Notifications                                   both  │
- │  Memory                                            on  │
- │  Line numbers in code                             off  │
- │                                                        │
- │API keys ────────────────────────────────────────────── │
- │  openrouter                                    no key  │
- │  opencode-zen                                  no key  │
- ╰────────────────────────────────────────────────────────╯
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+  ╭ Settings ────────────────────────────────────────────╮
+  │Appearance and behaviour ──────────────────────────── │
+  │❯ Theme                                    Driftwave  │
+  │  Variant                                     normal  │
+  │  Accent                                 theme's own  │
+  │  Theme background                  off (terminal's)  │
+  │  Context size (local models)           16384 tokens  │
+  │  Idle compaction                                off  │
+  │  Notifications                                 both  │
+  │  Memory                                          on  │
+  │  Line numbers in code                           off  │
+  │  Home screen                      fits the terminal  │
+  │  Detail pane                    a third of the list  │
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
  enter change  ←→ adjust  ↑↓ choose  d remove key  tab next

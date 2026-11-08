@@ -4,21 +4,20 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 6 │ Runtimes │ Providers 3 │ MCP 4 │
- ╭ Home ──────────────────────────────────────────────────╮
- │Continue ────────────────────────────────────────────── │
- │❯ ↩ fix the retry loop · 5 minutes ago · 12 messages    │
- │  ↩ add tests · 2 hours ago · 4 messages                │
- │                                                        │
- │Start ───────────────────────────────────────────────── │
- │  ★ openrouter/free-coder                           free│
- │                                                        │
- │More ────────────────────────────────────────────────── │
- │  ⌕ Give the model web search                       /web│
- │  ◆ Change theme                                  /theme│
- │  ⚙ Settings                                         tab│
- │                                                        │
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+   Home │ Models 6 │ Runtimes │ Providers 3 │ MCP 4 │
+  ╭ Home ────────────────────────────────────────────────╮
+  │Continue ──────────────────────────────────────────── │
+  │❯ ↩ fix the retry loop · 5 minutes ago · 12 messages  │
+  │  ↩ add tests · 2 hours ago · 4 messages              │
+  │                                                      │
+  │Start ─────────────────────────────────────────────── │
+  │  ★ openrouter/free-coder                         free│
+  │                                                      │
+  │More ──────────────────────────────────────────────── │
+  │  ⌕ Give the model web search                     /web│
+  │  ◆ Change theme                                /theme│
+  │  ⚙ Settings                                       tab│
+  │                                                      │
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
   enter open  ↑↓ choose  d delete chat  tab next  ^R rescan

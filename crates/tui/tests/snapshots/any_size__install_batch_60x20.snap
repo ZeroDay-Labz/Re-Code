@@ -4,7 +4,7 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
 ╭ Install skills ──────────────────────────────────────────╮
 │ 2 of 3 skills can be installed; 2 ticked.                │
 │                                                          │
@@ -18,7 +18,6 @@ expression: "screen(&draw(app, width, height))"
 │ y install ticked  k install off  space tick  a all       │
 │                                                          │
 ╰──────────────────────────────────────────────────────────╯
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
  a add  i install  e edit  space on/off  d delete  s browse

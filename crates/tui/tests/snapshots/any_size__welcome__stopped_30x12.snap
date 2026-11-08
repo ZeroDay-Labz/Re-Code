@@ -4,13 +4,13 @@ expression: "screen(&draw(app, width, height))"
 ---
            ◆ re-code
 
-  Home │ Models 0 │ Runtimes
- Ollama is installed but
- stopped
+   Home │ Models 0 │
+  Ollama is installed but
+  stopped
 
- To start it: systemctl
- --user start ollama.service
+  To start it: systemctl
+  --user start
+  ollama.service
 
- This also starts the other
- containers in local-ai.pod.
+  This also starts the
  tab next  ^R rescan  ^C quit

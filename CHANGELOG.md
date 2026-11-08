@@ -5,6 +5,17 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-08
+
+### Added
+
+- The home screen fits the terminal: lists and the detail pane beside them use the window's width and
+  height instead of a 116-column, 24-row column. The Settings tab's "Home screen" row keeps the composed
+  column for anyone who prefers it, and its "Detail pane" row sets how much of a list's width the
+  details take (a third by default, half, or three fifths; never narrower than before).
+- `v` on a model, provider, MCP server, skill, plugin or tool opens everything the detail pane says in
+  the pager, full width and searchable, so nothing is cut short in a narrow pane.
+
 ## [0.1.7] - 2026-11-08
 
 ### Added

@@ -4,8 +4,8 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
- ╭ MCP servers ───────────────────────────────────────────╮
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+  ╭ MCP servers ─────────────────────────────────────────╮
 ╭ Search the MCP registry ─────────────────────────────────╮
 │ Search  filesystem▏                                      │
 │                                                          │
@@ -17,8 +17,7 @@ expression: "screen(&draw(app, width, height))"
 │ enter add  ↑↓ choose  type to search again  esc cancel   │
 │                                                          │
 ╰──────────────────────────────────────────────────────────╯
- │                                                        │
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+  │                                                      │
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
 a add  p preset  s search  f tools  t test  i import  e edit

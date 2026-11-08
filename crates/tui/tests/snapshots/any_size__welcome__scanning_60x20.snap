@@ -4,21 +4,20 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models │ Runtimes │ Providers │ MCP │ Skills │
- ╭ Models ────────────────────────────────────────────────╮
- │⠋ Looking for models…                                   │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+   Home │ Models │ Runtimes │ Providers │ MCP │ Skills │
+  ╭ Models ──────────────────────────────────────────────╮
+  │⠋ Looking for models…                                 │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
                 tab next  ^R rescan  ^C quit

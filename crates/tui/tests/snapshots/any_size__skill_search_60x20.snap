@@ -4,7 +4,7 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
 ╭ Browse skills ───────────────────────────────────────────╮
 │ Filter  pdf▏   2 of 1 234                                │
 │ Source  all 102 402 · official 141 · clawhub 82 671 ·  … │
@@ -18,7 +18,6 @@ expression: "screen(&draw(app, width, height))"
 │                                                          │
 │                                                          │
 ╰──────────────────────────────────────────────────────────╯
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
  a add  i install  e edit  space on/off  d delete  s browse

@@ -2,7 +2,6 @@
 source: crates/tui/tests/any_size.rs
 expression: "screen(&draw(app, width, height))"
 ---
-
                                             █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
                                             █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
@@ -21,6 +20,8 @@ expression: "screen(&draw(app, width, height))"
   │  ⌕ Give the model web search                                                                                 /web│
   │  ◆ Change theme                                                                                            /theme│
   │  ⚙ Settings                                                                                                   tab│
+  │                                                                                                                  │
+  │                                                                                                                  │
   │                                                                                                                  │
   │                                                                                                                  │
   │                                                                                                                  │

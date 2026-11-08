@@ -2,7 +2,6 @@
 source: crates/tui/tests/any_size.rs
 expression: "screen(&draw(app, width, height))"
 ---
-
                                             █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
                                             █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
@@ -22,6 +21,8 @@ expression: "screen(&draw(app, width, height))"
   │ pod pod_firecrawl  :3002                                               │ Yours: re-code only starts it when you  │
   │    ○ firecrawl_api_1                           Exited (0) 2 hours ago  │ say so, and never stops or changes it.  │
   │ ? http://127.0.0.1:8080: answers HTTP 404, but not like a runtime re-… │                                         │
+  │                                                                        │                                         │
+  │                                                                        │                                         │
   │                                                                        │                                         │
   │                                                                        │                                         │
   │                                                                        │                                         │

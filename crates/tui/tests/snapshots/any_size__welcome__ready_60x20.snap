@@ -4,21 +4,20 @@ expression: "screen(&draw(app, width, height))"
 ---
                           ◆ re-code
 
-  Home │ Models 5 │ Runtimes │ Providers │ MCP │ Skills │
- ╭ Ollama 0.40.14 · 5 of 5 models ────────────────────────╮
- │/ type to filter                                        │
- │                                                        │
- │❯ ● gpt-oss:20b                          12.8 GiB  tools│
- │  ● llama3.2:3b                           1.9 GiB  tools│
- │  · a-very-long-model-name-that-will-n…   8.0 GiB  tools│
- │  ◐ qwen3.6:27b-coding                   16.5 GiB  tools│
- │  ● deephat:7b-q4                         4.4 GiB       │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- │                                                        │
- ╰────────────────────────────────────────────────────────╯
+   Home │ Models 5 │ Runtimes │ Providers │ MCP │ Skills
+  ╭ Ollama 0.40.14 · 5 of 5 models ──────────────────────╮
+  │/ type to filter                                      │
+  │                                                      │
+  │❯ ● gpt-oss:20b                        12.8 GiB  tools│
+  │  ● llama3.2:3b                         1.9 GiB  tools│
+  │  · a-very-long-model-name-that-will…   8.0 GiB  tools│
+  │  ◐ qwen3.6:27b-coding                 16.5 GiB  tools│
+  │  ● deephat:7b-q4                       4.4 GiB       │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  │                                                      │
+  ╰──────────────────────────────────────────────────────╯
  enter start  ↑↓ choose  ^F free ○  ^T tools ○  ^V vision ○

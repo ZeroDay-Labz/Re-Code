@@ -7,28 +7,27 @@ expression: "screen(&draw(app, width, height))"
                                   █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
                                  a coding agent for your own machine
 
-  Home │ Models 0 │ Runtimes │ Providers │ MCP │ Skills │ Plugins │ Tools │ Settings │
- ╭ Ollama ────────────────────────────────────────────────────────────────────────────────────────╮
- │Ollama is installed but stopped                                                                 │
- │                                                                                                │
- │To start it: systemctl --user start ollama.service                                              │
- │                                                                                                │
- │This also starts the other containers in local-ai.pod.                                          │
- │                                                                                                │
- │Press Ctrl+R to look again.                                                                     │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- │                                                                                                │
- ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
- GPU       None found
+   Home │ Models 0 │ Runtimes │ Providers │ MCP │ Skills │ Plugins │ Tools │ Settings │
+  ╭ Ollama ──────────────────────────────────────────────────────────────────────────────────────╮
+  │Ollama is installed but stopped                                                               │
+  │                                                                                              │
+  │To start it: systemctl --user start ollama.service                                            │
+  │                                                                                              │
+  │This also starts the other containers in local-ai.pod.                                        │
+  │                                                                                              │
+  │Press Ctrl+R to look again.                                                                   │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  │                                                                                              │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU       None found
                                     tab next  ^R rescan  ^C quit

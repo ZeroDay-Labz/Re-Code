@@ -2,7 +2,6 @@
 source: crates/tui/tests/any_size.rs
 expression: "screen(&draw(app, width, height))"
 ---
-
                                             █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
                                             █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
@@ -20,6 +19,8 @@ expression: "screen(&draw(app, width, height))"
   │  Notifications                                                                                             both  │
   │  Memory                                                                                                      on  │
   │  Line numbers in code                                                                                       off  │
+  │  Home screen                                                                                  fits the terminal  │
+  │  Detail pane                                                                                a third of the list  │
   │                                                                                                                  │
   │API keys ──────────────────────────────────────────────────────────────────────────────────────────────────────── │
   │  openrouter                                                                                              no key  │

@@ -7,28 +7,27 @@ expression: "screen(&draw(app, width, height))"
                                   █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
                                  a coding agent for your own machine
 
-  Home │ Models 2 │ Runtimes │ Providers │ MCP │ Skills │ Plugins │ Tools │ Settings │
- ╭ Cloud · 2 of 2 models ─────────────────────────────────────────────────────────────────────────╮
- │Ollama is installed but stopped                                                                 │
- │To start it: systemctl --user start ollama.service                                              │
- │This also starts the other containers in local-ai.pod.                                          │
- │                                                                                                │
- │/ type to filter                                        │ openrouter/free-coder                 │
- │                                                        │ qwen · 20B · Q4_K_M                   │
- │─ Free · no charge on your account · 1 ───────────────  │ Free Coder                            │
- │❯ ★ openrouter/free-coder             openrouter  tools │                                       │
- │─ Paid · your openai account · 1 ─────────────────────  │ A compact model for agents and tool   │
- │  ☁ gpt-5-mini                            openai  tools │ calling, with a long context and      │
- │                                                        │ structured output. It reasons before  │
- │                                                        │ it answers. Prompts may be retained   │
- │                                                        │ by the provider.                      │
- │                                                        │                                       │
- │                                                        │  free                                 │
- │                                                        │  tools   thinking                     │
- │                                                        │ As the provider reports them; not     │
- │                                                        │ tested here.                          │
- │                                                        │                                       │
- │                                                        │ Runs on the provider's servers, so it │
- ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
- GPU       None found
- enter start  ↑↓ choose  ^F free ○  ^T tools ○  ^V vision ○  ^P provider ○  k key  tab next  ^C quit
+   Home │ Models 2 │ Runtimes │ Providers │ MCP │ Skills │ Plugins │ Tools │ Settings │
+  ╭ Cloud · 2 of 2 models ───────────────────────────────────────────────────────────────────────╮
+  │Ollama is installed but stopped                                                               │
+  │To start it: systemctl --user start ollama.service                                            │
+  │This also starts the other containers in local-ai.pod.                                        │
+  │                                                                                              │
+  │/ type to filter                                      │ openrouter/free-coder                 │
+  │                                                      │ qwen · 20B · Q4_K_M                   │
+  │─ Free · no charge on your account · 1 ─────────────  │ Free Coder                            │
+  │❯ ★ openrouter/free-coder           openrouter  tools │                                       │
+  │─ Paid · your openai account · 1 ───────────────────  │ A compact model for agents and tool   │
+  │  ☁ gpt-5-mini                          openai  tools │ calling, with a long context and      │
+  │                                                      │ structured output. It reasons before  │
+  │                                                      │ it answers. Prompts may be retained   │
+  │                                                      │ by the provider.                      │
+  │                                                      │                                       │
+  │                                                      │  free                                 │
+  │                                                      │  tools   thinking                     │
+  │                                                      │ As the provider reports them; not     │
+  │                                                      │ tested here.                          │
+  │                                                      │                                       │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU       None found
+    enter start  ↑↓ choose  ^F free ○  ^T tools ○  ^V vision ○  ^P provider ○  k key  v read all

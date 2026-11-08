@@ -347,27 +347,46 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, tab: HomeTab, sele
         return;
     }
     let show_details = area.width >= DETAILS_WIDTH + 30 && area.height >= 5;
-    let list = if show_details { Rect::new(area.x, area.y, area.width - DETAILS_WIDTH - 3, area.height) } else { area };
+    let pane = crate::welcome::detail_width(area.width, DETAILS_WIDTH, app);
+    let list = if show_details { Rect::new(area.x, area.y, area.width - pane - 3, area.height) } else { area };
     draw_rows(frame, list, &rows, selected, app);
     if show_details {
-        let details = Rect::new(list.x + list.width + 3, area.y, DETAILS_WIDTH, area.height);
+        let details = Rect::new(list.x + list.width + 3, area.y, pane, area.height);
         let rule: Vec<Line<'_>> = (0..details.height).map(|_| Line::styled("│", theme::faint())).collect();
         frame.render_widget(Paragraph::new(rule), Rect::new(details.x - 2, details.y, 1, details.height));
-        let width = usize::from(details.width);
-        let lines = match tab {
-            HomeTab::Providers => {
-                extensions.providers.get(selected).map(|provider| provider_details(provider, &extensions, width))
-            }
-            HomeTab::Mcp => extensions.servers.get(selected).map(|server| server_details(server, &extensions, width)),
-            HomeTab::Skills => extensions.skills.get(selected).map(|skill| skill_details(skill, width)),
-            HomeTab::Tools => extensions.tools.get(selected).map(|tool| tool_details(tool, width)),
-            HomeTab::Plugins => {
-                plugin_rows(&extensions).get(selected).map(|row| plugin_details(row, &extensions, width))
-            }
-            HomeTab::Models | HomeTab::Home | HomeTab::Settings | HomeTab::Runtimes => None,
-        };
+        let lines = detail_lines(tab, selected, &extensions, usize::from(details.width));
         frame.render_widget(Paragraph::new(lines.unwrap_or_default()), details);
     }
+}
+
+/// Everything the detail pane says about the selected row, wrapped to `width`; `v` reads it in the pager.
+#[must_use]
+pub fn detail_lines(
+    tab: HomeTab,
+    selected: usize,
+    extensions: &ExtensionsSnapshot,
+    width: usize,
+) -> Option<Vec<Line<'static>>> {
+    match tab {
+        HomeTab::Providers => {
+            extensions.providers.get(selected).map(|provider| provider_details(provider, extensions, width))
+        }
+        HomeTab::Mcp => extensions.servers.get(selected).map(|server| server_details(server, extensions, width)),
+        HomeTab::Skills => extensions.skills.get(selected).map(|skill| skill_details(skill, width)),
+        HomeTab::Tools => extensions.tools.get(selected).map(|tool| tool_details(tool, width)),
+        HomeTab::Plugins => plugin_rows(extensions).get(selected).map(|row| plugin_details(row, extensions, width)),
+        HomeTab::Models | HomeTab::Home | HomeTab::Settings | HomeTab::Runtimes => None,
+    }
+}
+
+/// The lines as plain text, one per line, for the pager.
+#[must_use]
+pub fn plain_text(lines: &[Line<'_>]) -> String {
+    lines
+        .iter()
+        .map(|line| line.spans.iter().map(|span| span.content.as_ref()).collect::<String>().trim_end().to_owned())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn draw_empty(frame: &mut Frame<'_>, area: Rect, tab: HomeTab) {
