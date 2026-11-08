@@ -43,6 +43,8 @@ pub enum Action {
     StartRuntime(String),
     /// Trust the project folder's configuration (the user saw what it holds in a Confirm overlay).
     TrustProject,
+    /// Stop trusting it (confirmed).
+    UntrustProject,
     /// Open a file in the user's editor.
     EditFile(String),
     /// Copy text to the system clipboard.
@@ -149,9 +151,21 @@ pub enum Screen {
 }
 
 /// A window over the conversation.
+/// A search inside the pager: what's being typed, the query in force, the matching lines.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PagerSearch {
+    pub typing: Option<String>,
+    pub query: String,
+    pub matches: Vec<usize>,
+    pub current: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Overlay {
-    Help,
+    /// Every key, scrolling when the window is short.
+    Help {
+        offset: usize,
+    },
     /// What fills the context window, by part.
     Context,
     /// This session's compactions, newest first.
@@ -220,6 +234,7 @@ pub enum Overlay {
         /// Old and new side by side (diffs only, when the window is wide).
         side_by_side: bool,
         offset: usize,
+        search: PagerSearch,
     },
     /// Which code block of the last answer to copy.
     CodeBlocks {
@@ -308,6 +323,7 @@ pub enum PaletteCommand {
     Theme,
     FreeModels,
     TrustProject,
+    UntrustProject,
     InstallSkill,
     InstallPlugin,
     WebSearch,
@@ -331,6 +347,7 @@ pub const PALETTE: &[(PaletteCommand, &str, &str)] = &[
     (PaletteCommand::Theme, "Change theme", ""),
     (PaletteCommand::FreeModels, "Get free models", "/free"),
     (PaletteCommand::TrustProject, "Trust this folder's configuration (project skills)", "/trust"),
+    (PaletteCommand::UntrustProject, "Stop trusting this folder's configuration", "/untrust"),
     (PaletteCommand::InstallSkill, "Install a skill from a hub (Hermes, GitHub, skills.sh)", "/skill install"),
     (PaletteCommand::InstallPlugin, "Install a plugin (Hermes catalog, Claude Code marketplaces)", "/plugin install"),
     (PaletteCommand::WebSearch, "Give the model web search (SearXNG, DuckDuckGo, Brave…)", "/web"),
@@ -1707,8 +1724,14 @@ impl App {
                 KeyCode::Char('n') => return vec![Action::ResolveApproval(approval, ApprovalDecision::Deny)],
                 KeyCode::Char('d') => {
                     if let Some(diff) = diff {
-                        self.overlay =
-                            Some(Overlay::Pager { title, text: diff, is_diff: true, side_by_side: false, offset: 0 });
+                        self.overlay = Some(Overlay::Pager {
+                            title,
+                            text: diff,
+                            is_diff: true,
+                            side_by_side: false,
+                            offset: 0,
+                            search: PagerSearch::default(),
+                        });
                     }
                     return Vec::new();
                 }
@@ -1961,6 +1984,7 @@ impl App {
             "theme" | "themes" => self.run_command(PaletteCommand::Theme),
             "free" => self.run_command(PaletteCommand::FreeModels),
             "trust" => self.run_command(PaletteCommand::TrustProject),
+            "untrust" => self.run_command(PaletteCommand::UntrustProject),
             "skill" => {
                 let mut words = argument.splitn(2, char::is_whitespace);
                 let verb = words.next().unwrap_or_default();
@@ -1986,7 +2010,14 @@ impl App {
                 } else {
                     let files = text.lines().filter(|line| line.starts_with("+++ ")).count();
                     let title = format!("Changes this session · {files} file{}", if files == 1 { "" } else { "s" });
-                    self.overlay = Some(Overlay::Pager { title, text, is_diff: true, side_by_side: false, offset: 0 });
+                    self.overlay = Some(Overlay::Pager {
+                        title,
+                        text,
+                        is_diff: true,
+                        side_by_side: false,
+                        offset: 0,
+                        search: PagerSearch::default(),
+                    });
                 }
                 Vec::new()
             }
@@ -2053,7 +2084,7 @@ impl App {
             return vec![Action::Refresh];
         }
         if key.code == KeyCode::F(1) {
-            self.overlay = Some(Overlay::Help);
+            self.overlay = Some(Overlay::Help { offset: 0 });
             return Vec::new();
         }
         let tab_move = match key.code {
@@ -2187,6 +2218,13 @@ impl App {
             choices[usize::try_from(next).unwrap_or(0)].to_owned()
         };
         match &setting.kind {
+            SettingKind::Autostart(id) if key.code == KeyCode::Char('d') => {
+                let key = format!("autostart:{id}");
+                self.settings.remove(&key);
+                self.toast("It won't be started at launch any more.", ToastLevel::Info);
+                vec![Action::SetSetting { key, value: String::new() }]
+            }
+            SettingKind::Autostart(_) => Vec::new(),
             SettingKind::Theme if step != 0 => self.run_command(PaletteCommand::Theme),
             SettingKind::Variant | SettingKind::Accent | SettingKind::Background if self.theme_locked => {
                 self.toast("The theme is set in config.toml, so it can't be changed here.", ToastLevel::Info);
@@ -2459,8 +2497,14 @@ impl App {
 
     /// Opens long text from the driver in the pager.
     pub fn open_pager(&mut self, title: String, text: String) {
-        self.overlay =
-            Some(Overlay::Pager { title, text: sanitize(&text), is_diff: false, side_by_side: false, offset: 0 });
+        self.overlay = Some(Overlay::Pager {
+            title,
+            text: sanitize(&text),
+            is_diff: false,
+            side_by_side: false,
+            offset: 0,
+            search: PagerSearch::default(),
+        });
     }
 
     /// The driver's word on the active model's context window.
@@ -2996,6 +3040,31 @@ impl App {
         }
     }
 
+    /// `/untrust`: asks, then switches the project folder's configuration off again.
+    fn untrust_project(&mut self) {
+        if self.demo {
+            self.toast("That isn't available in the demo recording.", ToastLevel::Info);
+            return;
+        }
+        let Some(trust) = self.project_trust.clone() else {
+            self.toast("Still looking at this folder's configuration; try again in a moment.", ToastLevel::Info);
+            return;
+        };
+        if !trust.trusted {
+            self.toast("This folder's configuration isn't trusted.", ToastLevel::Info);
+            return;
+        }
+        let mut body = vec![format!("{} stops being trusted:", trust.folder)];
+        body.extend(trust.skills.iter().map(|skill| format!("  skill  {skill} goes off")));
+        body.extend(trust.files.iter().map(|file| format!("  file   {file} stops loading")));
+        body.push("Project hooks stop running too. /trust brings it back after a look at what it holds.".to_owned());
+        self.overlay = Some(Overlay::Confirm(ConfirmState {
+            title: "Stop trusting this folder?".to_owned(),
+            body,
+            command: Confirmed::UntrustProject,
+        }));
+    }
+
     /// `/web`: offers web-search MCP servers to set up.
     pub fn open_web_setup(&mut self) {
         if self.demo {
@@ -3503,7 +3572,7 @@ impl App {
             KeyCode::End if self.input.is_empty() => self.transcript.follow(),
             KeyCode::Home => self.input.line_start(),
             KeyCode::End => self.input.line_end(),
-            KeyCode::F(1) => self.overlay = Some(Overlay::Help),
+            KeyCode::F(1) => self.overlay = Some(Overlay::Help { offset: 0 }),
             _ => {}
         }
         Vec::new()
@@ -3705,6 +3774,32 @@ impl App {
                 _ => {}
             },
             Overlay::Confirm(confirm) => match key.code {
+                // `a` on a runtime start: start it now and every time re-code opens, as long as the
+                // command stays exactly this one.
+                KeyCode::Char('a') if matches!(confirm.command, Confirmed::StartRuntime(_)) => {
+                    let Confirmed::StartRuntime(id) = confirm.command.clone() else { return Vec::new() };
+                    self.overlay = None;
+                    let command = self.runtimes.as_ref().and_then(|info| {
+                        info.runtimes.iter().find(|r| r.id == id).and_then(|r| match &r.state {
+                            crate::link::RuntimeRowState::Stopped { start_command: Some(command), .. } => {
+                                Some(command.clone())
+                            }
+                            _ => None,
+                        })
+                    });
+                    self.runtime_starting = Some((id.clone(), "starting…".to_owned()));
+                    let mut actions = vec![Action::StartRuntime(id.clone())];
+                    if let Some(command) = command {
+                        let key = format!("autostart:{id}");
+                        self.settings.insert(key.clone(), command.clone());
+                        actions.push(Action::SetSetting { key, value: command });
+                        self.toast(
+                            "It will be started whenever re-code opens; the Settings tab lists it.",
+                            ToastLevel::Info,
+                        );
+                    }
+                    return actions;
+                }
                 KeyCode::Char('y') | KeyCode::Enter => {
                     let command = confirm.command.clone();
                     self.overlay = None;
@@ -3715,6 +3810,7 @@ impl App {
                             vec![Action::StartRuntime(id)]
                         }
                         Confirmed::TrustProject => vec![Action::TrustProject],
+                        Confirmed::UntrustProject => vec![Action::UntrustProject],
                         Confirmed::WriteInit => vec![Action::WriteInit],
                         Confirmed::ForgetMemory { scope, name } => vec![Action::ForgetMemory { scope, name }],
                         Confirmed::DeleteSession(id) => vec![Action::DeleteSession(id)],
@@ -3731,11 +3827,16 @@ impl App {
                     return vec![Action::Extension(*command)];
                 }
             },
-            Overlay::Help => {
-                if matches!(key.code, KeyCode::Esc | KeyCode::Char('q') | KeyCode::F(1) | KeyCode::Enter) {
-                    self.overlay = None;
-                }
-            }
+            Overlay::Help { offset } => match key.code {
+                KeyCode::Esc | KeyCode::Char('q') | KeyCode::F(1) | KeyCode::Enter => self.overlay = None,
+                KeyCode::Up | KeyCode::Char('k') => *offset = offset.saturating_sub(1),
+                KeyCode::Down | KeyCode::Char('j') => *offset = offset.saturating_add(1),
+                KeyCode::PageUp => *offset = offset.saturating_sub(10),
+                KeyCode::PageDown | KeyCode::Char(' ') => *offset = offset.saturating_add(10),
+                KeyCode::Home => *offset = 0,
+                KeyCode::End => *offset = usize::MAX,
+                _ => {}
+            },
             Overlay::Tasks { tasks, selected } => match key.code {
                 KeyCode::Esc | KeyCode::Char('q') => self.overlay = None,
                 KeyCode::Up => *selected = selected.saturating_sub(1),
@@ -3973,11 +4074,48 @@ impl App {
                 }
                 _ => {}
             },
-            Overlay::Pager { text, is_diff, side_by_side, offset, .. } => {
+            Overlay::Pager { text, is_diff, side_by_side, offset, search, .. } => {
                 let page = self.view_size.1.saturating_sub(2).max(1);
                 let width = self.terminal_width.saturating_sub(4);
+                // Typing a search: the keys go to the query until Enter or Esc.
+                if let Some(typing) = &mut search.typing {
+                    match key.code {
+                        KeyCode::Esc => search.typing = None,
+                        KeyCode::Backspace => {
+                            typing.pop();
+                        }
+                        KeyCode::Enter => {
+                            let wanted = typing.to_lowercase();
+                            search.query = std::mem::take(typing);
+                            search.typing = None;
+                            let lines = crate::view::pager_plain_lines(text, *is_diff, *side_by_side, width);
+                            search.matches = lines
+                                .iter()
+                                .enumerate()
+                                .filter(|(_, line)| !wanted.is_empty() && line.to_lowercase().contains(&wanted))
+                                .map(|(index, _)| index)
+                                .collect();
+                            search.current = search.matches.iter().position(|line| *line >= *offset).unwrap_or(0);
+                            if let Some(line) = search.matches.get(search.current) {
+                                *offset = *line;
+                            }
+                        }
+                        KeyCode::Char(c) if !ctrl => typing.push(c),
+                        _ => {}
+                    }
+                    return Vec::new();
+                }
                 match key.code {
                     KeyCode::Esc | KeyCode::Char('q') => self.overlay = None,
+                    KeyCode::Char('/') => search.typing = Some(String::new()),
+                    KeyCode::Char('n') if !search.matches.is_empty() => {
+                        search.current = (search.current + 1) % search.matches.len();
+                        *offset = search.matches[search.current];
+                    }
+                    KeyCode::Char('N') if !search.matches.is_empty() => {
+                        search.current = (search.current + search.matches.len() - 1) % search.matches.len();
+                        *offset = search.matches[search.current];
+                    }
                     KeyCode::Up | KeyCode::Char('k') => *offset = offset.saturating_sub(1),
                     KeyCode::Down | KeyCode::Char('j') => *offset = offset.saturating_add(1),
                     KeyCode::PageUp => *offset = offset.saturating_sub(page),
@@ -4156,7 +4294,14 @@ impl App {
                     let is_diff = tool.output.is_empty();
                     let text = if is_diff { tool.diff.clone().unwrap_or_default() } else { tool.output.clone() };
                     let title = format!("{} {}", tool.name, tool.target);
-                    self.overlay = Some(Overlay::Pager { title, text, is_diff, side_by_side: false, offset: 0 });
+                    self.overlay = Some(Overlay::Pager {
+                        title,
+                        text,
+                        is_diff,
+                        side_by_side: false,
+                        offset: 0,
+                        search: PagerSearch::default(),
+                    });
                 }
             }
             // Files are still changing while a turn runs, so undo waits until it has finished.
@@ -4187,6 +4332,7 @@ impl App {
                 }
             }
             PaletteCommand::TrustProject => return self.trust_project(),
+            PaletteCommand::UntrustProject => self.untrust_project(),
             PaletteCommand::InstallSkill => return self.open_install(None),
             PaletteCommand::InstallPlugin => return self.open_plugin_install(None),
             PaletteCommand::WebSearch => self.open_web_setup(),
@@ -4201,7 +4347,7 @@ impl App {
                 let selected = crate::theme::names().iter().position(|name| *name == self.theme.name).unwrap_or(0);
                 self.overlay = Some(Overlay::Themes { selected, original: self.theme.clone() });
             }
-            PaletteCommand::Help => self.overlay = Some(Overlay::Help),
+            PaletteCommand::Help => self.overlay = Some(Overlay::Help { offset: 0 }),
             PaletteCommand::Context => {
                 if self.ledger.is_none() && self.context.is_none() {
                     self.toast(

@@ -104,6 +104,7 @@ const TOOLCHAINS: &[&str] = &[
     ".rustup",
     ".local/bin",
     ".local/lib",
+    ".local/opt",
     ".local/share/mise",
     ".nvm",
     ".volta",

@@ -336,6 +336,11 @@ Done ahead of schedule: Anthropic, OpenAI and Gemini reachable (OpenAI-compatibl
   (X8).
 - **Landed 2026-11-08:** saved chats can be deleted from the Home list and the session picker (`d`, with a
   confirmation; the session writer deletes and re-sends the list; deleting the open chat starts a new one).
+- **Landed 2026-11-08 (M small items, U5):** `/untrust` in the interface and palette, runtime autostart
+  (`a` on the start confirmation, `ui:autostart:<id>` holds the exact command, Settings row with `d`), pager
+  search (`/`, `n`, `N` over the lines as drawn), a scrolling Help overlay. Fixed: the stdio MCP sandbox read
+  the plugin folders once at startup and not at all from the command line. Click-to-copy a code line (U5)
+  not done; U1–U4 not started.
 - **Landed 2026-11-08 (production P1, P2, P4; live cloud L):** crash files and `doctor --report`
   (`crates/app/src/crash.rs`), `--version` with commit and date (`build.rs`), a week of logs, GitHub Actions
   CI (gate on Ubuntu, rpm in a Fedora 44 container, deb on Ubuntu 22.04 for an old glibc) and a tag-driven

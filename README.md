@@ -107,9 +107,23 @@ re-code doctor       what re-code found on this machine, and why
 
 ## Features
 
+### Reading the Models tab
+
+Each local model has a mark, from the model's size against the GPU memory that is free right now:
+
+| Mark | Means |
+| --- | --- |
+| `●` green | Fits your GPU with room to spare: it should run entirely on the GPU. |
+| `◐` yellow | Partly on the CPU: the weights are larger than the free GPU memory, so some layers run slowly on the CPU. The details pane says by how much. |
+| `○` red | Larger than your available memory altogether. It probably won't load. |
+| `·` grey | Your GPU's free memory isn't known (no GPU, or a driver that doesn't report it), so there's no estimate. |
+| `☁` | A cloud model: it runs on the provider's servers. |
+
+A dimmed row is a model that doesn't declare tool calling: it can chat, but it can't read or change files. The chips after the name (`tools`, `vision`, `thinking`) are what the model declares, not what has been tested, until it has been used. The estimate counts the context's key/value cache on top of the weights, so a model that fits at 16k may show as partly on the CPU at 64k.
+
 ### Models and runtimes
 
-- **Local first.** Ollama is native. llama.cpp, vLLM and LM Studio are found by what they answer. `re-code doctor` explains each one: which container or systemd unit serves it, whether it has GPU devices, and the exact command that would start it. Nothing is started without your `y`.
+- **Local first.** Ollama is native. llama.cpp, vLLM and LM Studio are found by what they answer. `re-code doctor` explains each one: which container or systemd unit serves it, whether it has GPU devices, and the exact command that would start it. Nothing is started without your `y`; `a` instead starts it now and every time re-code opens, as long as the command stays the same.
 - **Honest model facts.** Sizes come from the runtime. Tool, vision and thinking support is shown as *declared* until a model is tested. Context limits come from the model's own metadata, and the memory its key/value cache needs is estimated per context size, so "fits your GPU" means with the context you'd actually use.
 - **Cloud when you want it.** Anthropic (native), OpenAI, Google Gemini, OpenRouter and any OpenAI-compatible endpoint, with presets for Ollama Cloud, NVIDIA, Hugging Face, Mistral, DeepSeek, Together, Fireworks, Moonshot, Z.AI, MiniMax, xAI, Novita, Groq and more. Keys live in the system keyring, never in a file.
 - **Free means free.** OpenRouter's free models are listed with their real facts from its own listing, and its daily allowance is shown after connecting ("3 of 50 requests used today; no credits bought yet"). A model that is $0 per token but charges per request is not called free. Paid models are grouped per provider, so what your Gemini key pays for isn't mixed with what your OpenRouter key pays for.
@@ -319,7 +333,7 @@ Exit codes: 0 done, 1 error, 2 refused (a dangerous skill, an unsupported source
 | `/mcp`, `/skills`, `/plugins`, `/tools`, `/providers`, `/model` | The home tabs |
 | `/skill install\|search\|update`, `/plugin install\|browse\|marketplace add` | Hubs and marketplaces |
 | `/web`, `/import opencode\|claude` | Web search for the model; bring in another tool's setup |
-| `/trust`, `/permissions`, `/plan`, `/add-dir <folder>` | Project trust, grants, the plan file, reach |
+| `/trust`, `/untrust`, `/permissions`, `/plan`, `/add-dir <folder>` | Project trust, grants, the plan file, reach |
 | `/memory`, `/init` | Instruction files and memory |
 | `/continue`, `/new`, `/rewind`, `/export`, `/transcript`, `/diff` | Sessions and history |
 | `/tasks`, `!command` | Background commands |

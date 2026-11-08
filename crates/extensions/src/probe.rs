@@ -50,6 +50,20 @@ impl Launch {
         }
     }
 
+    /// The launch for a project with re-code's installed plugins bound writable, read now, so a plugin
+    /// installed a moment ago is visible to its own server.
+    #[must_use]
+    pub fn for_project(project: Option<std::path::PathBuf>, plugins_dir: &std::path::Path) -> Self {
+        let writable = std::fs::read_dir(plugins_dir)
+            .map(|entries| entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()).collect())
+            .unwrap_or_default();
+        Self {
+            project: project.or_else(|| std::env::current_dir().ok()),
+            home: std::env::var_os("HOME").map(std::path::PathBuf::from),
+            writable,
+        }
+    }
+
     /// The program and arguments that start `command args` for this server: wrapped in bubblewrap
     /// when the server allows it and bubblewrap works here, otherwise as given. The environment the
     /// server needs goes in through `--setenv`, so a key reaches only that server.

@@ -5,6 +5,29 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-08
+
+### Added
+
+- `/untrust` (also in the palette) switches a trusted folder's configuration off again after a confirmation
+  that lists what goes off; `re-code untrust` does the same from the shell.
+- A runtime can be started whenever re-code opens: `a` on the start confirmation remembers the exact
+  command; it runs at launch only while the command is still that one (a changed setup asks again), and the
+  Settings tab lists it under "Runtimes started when re-code opens" with `d` to remove.
+- The pager (`/diff`, `/context raw`, a tool's output) searches with `/`, `n` and `N`, like the transcript.
+- The Help overlay (F1) scrolls on short terminals.
+
+### Fixed
+
+- A stdio MCP server from a plugin installed during the session, or tested from the command line, couldn't
+  see its own files inside the sandbox: the plugin folders are now read when the server starts, not once at
+  launch.
+
+### Changed
+
+- The sandbox shows `~/.local/opt` (where user-installed toolchains such as Node often live) to commands
+  and stdio MCP servers, read-only, like the other toolchain folders.
+
 ## [0.1.3] - 2026-11-08
 
 ### Added

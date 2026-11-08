@@ -278,6 +278,8 @@ pub enum UiCommand {
     StartRuntime(String),
     /// Trust the project folder's configuration as it is now, after the user saw what it holds.
     TrustProject,
+    /// Stop trusting the project folder's configuration: its skills, hooks and instruction files go off.
+    UntrustProject,
     ChooseModel(String),
     Send {
         text: String,

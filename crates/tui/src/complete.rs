@@ -49,6 +49,7 @@ pub const SLASH_COMMANDS: &[SlashCommand] = &[
     SlashCommand { name: "theme", argument: "", description: "Change the colours" },
     SlashCommand { name: "free", argument: "", description: "Get free models (OpenRouter)" },
     SlashCommand { name: "trust", argument: "", description: "Trust this folder's configuration (project skills)" },
+    SlashCommand { name: "untrust", argument: "", description: "Stop trusting this folder's configuration" },
     SlashCommand {
         name: "skill",
         argument: "install|search|update [what]",

@@ -385,6 +385,8 @@ pub enum Confirmed {
     /// Start the runtime with this id.
     StartRuntime(String),
     TrustProject,
+    /// Stop trusting the project folder's configuration.
+    UntrustProject,
     /// Write the `RE-CODE.md` that `/init` previewed.
     WriteInit,
     /// Delete a saved session (its messages and snapshot) by id.

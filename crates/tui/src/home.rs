@@ -192,6 +192,8 @@ pub enum SettingKind {
     Memory,
     /// An API key for this provider (preset name), and whether one is stored.
     ApiKey(String, bool),
+    /// A runtime (by id) that re-code starts when it opens, with the exact command it will run.
+    Autostart(String),
 }
 
 #[must_use]
@@ -303,6 +305,19 @@ pub fn settings_rows(app: &App) -> Vec<SettingRow> {
             },
         );
     }
+    // Runtimes started at launch: `a` on a start confirmation added them; `d` here removes them.
+    let mut autostarts: Vec<(&String, &String)> =
+        app.settings.iter().filter(|(key, _)| key.starts_with("autostart:")).collect();
+    autostarts.sort();
+    for (key, command) in autostarts {
+        let id = key.trim_start_matches("autostart:").to_owned();
+        rows.push(SettingRow {
+            label: "Start at launch",
+            value: command.clone(),
+            hint: "d removes",
+            kind: SettingKind::Autostart(id),
+        });
+    }
     for preset in recode_core::providers::PROVIDER_PRESETS {
         let stored = app.extensions.as_ref().is_some_and(|e| e.providers_with_keys.contains(preset.name));
         rows.push(SettingRow {
@@ -325,8 +340,11 @@ pub fn draw_settings(frame: &mut Frame<'_>, area: Rect, app: &mut App, selected:
     let mut lines: Vec<(Line<'static>, Option<usize>)> = Vec::new();
     let mut section = None;
     for (index, setting) in rows.iter().enumerate() {
-        let kind =
-            if matches!(setting.kind, SettingKind::ApiKey(..)) { "API keys" } else { "Appearance and behaviour" };
+        let kind = match setting.kind {
+            SettingKind::ApiKey(..) => "API keys",
+            SettingKind::Autostart(_) => "Runtimes started when re-code opens",
+            _ => "Appearance and behaviour",
+        };
         if section != Some(kind) {
             if section.is_some() {
                 lines.push((Line::default(), None));

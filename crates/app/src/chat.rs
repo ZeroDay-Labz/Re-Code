@@ -969,15 +969,16 @@ async fn drive(
 
     // A live pool of MCP connections for the agent. Rebuilt (connections dropped, reconnected lazily)
     // only when the enabled server set changes, so connections persist across turns otherwise.
-    // Stdio MCP servers run under bubblewrap with the project writable and the plugin folders bound.
-    let mcp_launch = recode_extensions::Launch {
-        project: workspace.as_ref().map(|ws| ws.root().to_path_buf()).or_else(|| std::env::current_dir().ok()),
-        home: std::env::var_os("HOME").map(std::path::PathBuf::from),
-        writable: std::fs::read_dir(paths.data_dir.join("plugins"))
-            .map(|entries| entries.flatten().map(|entry| entry.path()).filter(|path| path.is_dir()).collect())
-            .unwrap_or_default(),
+    // Stdio MCP servers run under bubblewrap with the project writable and the plugin folders bound;
+    // the folders are read each time so a plugin installed during the session is seen.
+    let project_root = workspace.as_ref().map(|ws| ws.root().to_path_buf());
+    let plugins_dir = paths.data_dir.join("plugins");
+    let mcp_launch = {
+        let project_root = project_root.clone();
+        let plugins_dir = plugins_dir.clone();
+        move || recode_extensions::Launch::for_project(project_root.clone(), &plugins_dir)
     };
-    let mut hub = McpHub::with_launch(manager.extensions.snapshot().servers, mcp_launch.clone());
+    let mut hub = McpHub::with_launch(manager.extensions.snapshot().servers, mcp_launch());
 
     let mut chat = match OllamaProvider::new(&url) {
         Ok(provider) => Chat::new(provider, num_ctx),
@@ -1028,6 +1029,30 @@ async fn drive(
     let _ = events.send(UiEvent::Extensions(manager.snapshot()));
     // Commands the driver gives itself, handled before waiting for the interface.
     let mut pending: std::collections::VecDeque<UiCommand> = std::collections::VecDeque::new();
+    // Runtimes the user asked to start at launch (`a` on the start confirmation): only when the saved
+    // command is still exactly the one re-code would run, so a changed setup asks again.
+    if let Some(store) = manager.store.as_ref() {
+        for runtime in &runtimes.runtimes {
+            let recode_runtime::RuntimeState::InstalledStopped { start: Some(method) } = &runtime.state else {
+                continue;
+            };
+            let Ok(Some(saved)) = store.setting(&format!("ui:autostart:{}", runtime.id)) else { continue };
+            if saved == method.command_line() {
+                let _ = events.send(UiEvent::Notice(format!(
+                    "Starting {} as you asked ({}). Remove it on the Settings tab if you'd rather not.",
+                    runtime.kind.name(),
+                    method.command_line()
+                )));
+                pending.push_back(UiCommand::StartRuntime(runtime.id.clone()));
+            } else {
+                let _ = events.send(UiEvent::Notice(format!(
+                    "{} isn't started automatically any more: its start command changed from `{saved}` to `{}`. Enter on the Runtimes tab starts it.",
+                    runtime.kind.name(),
+                    method.command_line()
+                )));
+            }
+        }
+    }
     if resume {
         pending.push_back(UiCommand::ContinueLast);
     }
@@ -1193,6 +1218,24 @@ async fn drive(
                     });
                 }
             }
+            UiCommand::UntrustProject => {
+                let result = match (&manager.places.project, manager.store.as_ref()) {
+                    (Some(project), Some(store)) => crate::trust::revoke(store, project),
+                    (None, _) => Err("there's no project folder".to_owned()),
+                    (_, None) => Err("the session database isn't available".to_owned()),
+                };
+                let (text, is_error) = match result {
+                    Ok(()) => {
+                        manager.refresh_trust();
+                        let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                        let _ = events.send(project_trust_event(&manager));
+                        ("This folder's configuration is no longer trusted: its skills, hooks and instruction files are off.".to_owned(), false)
+                    }
+                    Err(error) => (format!("Couldn't stop trusting it: {error}"), true),
+                };
+                let _ = events.send(UiEvent::Notice(text.clone()));
+                let _ = events.send(UiEvent::HomeMessage { text, is_error });
+            }
             UiCommand::TrustProject => {
                 let result = match (&manager.places.project, manager.store.as_ref()) {
                     (Some(project), Some(store)) => {
@@ -1306,7 +1349,7 @@ async fn drive(
                     manager.probing.push(name.clone());
                     let _ = events.send(UiEvent::Extensions(manager.snapshot()));
                     let sender = probe_results.clone();
-                    let launch = mcp_launch.clone();
+                    let launch = mcp_launch();
                     tokio::spawn(async move {
                         let result = recode_extensions::probe_with(&server, &launch).await;
                         let _ = sender.send((name, result));
@@ -1779,7 +1822,7 @@ async fn drive(
                         // new port each launch, so the address matters, not just the name).
                         let servers = manager.extensions.snapshot().servers;
                         if !hub.matches(&servers) {
-                            hub = McpHub::with_launch(servers, mcp_launch.clone());
+                            hub = McpHub::with_launch(servers, mcp_launch());
                         }
                         let hooks = std::sync::Arc::new(load_hooks(&manager, &paths));
                         let mut config = build_agent_config(&manager, &clean, plan_path.clone(), max_steps, hooks);

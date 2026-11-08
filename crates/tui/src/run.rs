@@ -176,7 +176,8 @@ async fn play_recording(events: UnboundedSender<UiEvent>, mut commands: Unbounde
                         | UiCommand::ListInstructions
                         | UiCommand::WriteNote { .. }
                         | UiCommand::ForgetMemory { .. }
-                        | UiCommand::DeleteSession(_),
+                        | UiCommand::DeleteSession(_)
+                        | UiCommand::UntrustProject,
                     ) => {
                         let _ = events.send(UiEvent::Notice("That isn't available in the demo recording.".to_owned()));
                         Vec::new()
@@ -673,6 +674,7 @@ fn perform(action: Action, commands: &UnboundedSender<UiCommand>) -> Result<bool
         Action::WriteNote { scope, text } => UiCommand::WriteNote { scope, text },
         Action::ForgetMemory { scope, name } => UiCommand::ForgetMemory { scope, name },
         Action::DeleteSession(id) => UiCommand::DeleteSession(id),
+        Action::UntrustProject => UiCommand::UntrustProject,
         Action::ShowCompaction(seq) => UiCommand::ShowCompaction(seq),
         Action::NewConversation => UiCommand::NewConversation,
         Action::ContinueLast => UiCommand::ContinueLast,

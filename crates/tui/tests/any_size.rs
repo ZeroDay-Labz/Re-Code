@@ -374,6 +374,76 @@ fn web_search_setup_offers_servers_and_prefills_the_mcp_form() {
 }
 
 #[test]
+fn the_pager_searches_and_help_scrolls_and_untrust_asks() {
+    // Pager search over the lines as drawn.
+    let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
+    let text: String = (1..=60).map(|i| format!("line {i}{}\n", if i % 20 == 0 { " needle" } else { "" })).collect();
+    app.open_pager("Sixty lines".to_owned(), text);
+    draw(&mut app, 100, 20);
+    for c in "/needle".chars() {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    let shown = screen(&draw(&mut app, 100, 20));
+    assert!(shown.contains("/needle▏"), "{shown}");
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    let shown = screen(&draw(&mut app, 100, 20));
+    assert!(shown.contains("/needle 1 of 3 (n/N)") && shown.contains("line 20 needle"), "{shown}");
+    app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE));
+    let shown = screen(&draw(&mut app, 100, 20));
+    assert!(shown.contains("2 of 3") && shown.contains("line 40 needle"), "{shown}");
+    app.handle_key(KeyEvent::new(KeyCode::Char('N'), KeyModifiers::NONE));
+    assert!(screen(&draw(&mut app, 100, 20)).contains("1 of 3"));
+
+    // Help scrolls when the terminal is short, and says where it is.
+    let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
+    app.handle_key(KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE));
+    let shown = screen(&draw(&mut app, 80, 14));
+    assert!(shown.contains("Keys · 1 of") && shown.contains("↑↓ scroll"), "{shown}");
+    app.handle_key(KeyEvent::new(KeyCode::PageDown, KeyModifiers::NONE));
+    let shown = screen(&draw(&mut app, 80, 14));
+    assert!(shown.contains("Keys · 11 of"), "{shown}");
+    let shown = screen(&draw(&mut app, 80, 50));
+    assert!(shown.contains("╭ Keys ") && !shown.contains("↑↓ scroll"), "{shown}");
+
+    // /untrust asks, listing what goes off, and y sends the command.
+    let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
+    app.project_trust = Some(recode_tui::link::ProjectTrust {
+        folder: "/home/someone/code/api-server".to_owned(),
+        trusted: true,
+        skills: vec!["review".to_owned()],
+        files: vec!["instructions.md".to_owned()],
+    });
+    app.input.insert("/untrust");
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).is_empty());
+    let shown = screen(&draw(&mut app, 100, 30));
+    assert!(shown.contains("Stop trusting this folder?") && shown.contains("skill  review goes off"), "{shown}");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+    assert!(matches!(actions.as_slice(), [Action::UntrustProject]), "{actions:?}");
+
+    // `a` on a runtime start remembers the command as an autostart; the Settings tab lists it with d.
+    let mut app = runtimes_tab();
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE)); // the stopped llama.cpp service
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    if matches!(app.overlay, Some(Overlay::Confirm(_))) {
+        let shown = screen(&draw(&mut app, 120, 36));
+        assert!(shown.contains("a yes, and at every launch"), "{shown}");
+        let actions = app.handle_key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE));
+        assert!(
+            matches!(actions.as_slice(), [Action::StartRuntime(_), Action::SetSetting { key, .. }] if key.starts_with("autostart:")),
+            "{actions:?}"
+        );
+        if let Screen::Welcome(welcome) = &mut app.screen {
+            welcome.tab = HomeTab::Settings;
+        }
+        let shown = screen(&draw(&mut app, 120, 40));
+        assert!(shown.contains("Runtimes started when re-code opens") && shown.contains("Start at launch"), "{shown}");
+    } else {
+        panic!("the runtimes scene should offer a start confirmation: {:?}", app.overlay);
+    }
+}
+
+#[test]
 fn saved_chats_can_be_deleted_from_home_and_the_picker_after_a_confirmation() {
     use recode_tui::link::SessionSummary;
     let sessions = vec![
@@ -835,7 +905,7 @@ fn dragging_outside_the_conversation_copies_what_is_on_screen_within_that_region
 
     // F2 hands the mouse to the terminal from any screen, including the home screen and overlays.
     assert_eq!(home.handle_key(KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE)), [Action::SetMouseCapture(false)]);
-    home.overlay = Some(Overlay::Help);
+    home.overlay = Some(Overlay::Help { offset: 0 });
     assert_eq!(home.handle_key(KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE)), [Action::SetMouseCapture(true)]);
 }
 
@@ -1347,8 +1417,7 @@ fn every_scene() -> Vec<(&'static str, App)> {
         text: "--- a/src/auth.rs\n+++ b/src/auth.rs\n@@ -39,7 +39,7 @@\n     for attempt in 0..MAX_RETRIES {\n-                let _delay = retry_delay(attempt);\n+                tokio::time::sleep(retry_delay(attempt)).await;\n     }\n".into(),
         is_diff: true,
         side_by_side: true,
-        offset: 0,
-    });
+        offset: 0, search: Default::default() });
     scenes.push(("pager side by side", app));
 
     let mut app = finished();
@@ -1438,7 +1507,7 @@ fn every_scene() -> Vec<(&'static str, App)> {
     scenes.push(("with image chips", app));
 
     let mut app = finished();
-    app.overlay = Some(Overlay::Help);
+    app.overlay = Some(Overlay::Help { offset: 0 });
     scenes.push(("help", app));
 
     let mut app = finished();
@@ -1452,6 +1521,7 @@ fn every_scene() -> Vec<(&'static str, App)> {
         is_diff: false,
         side_by_side: false,
         offset: 10_000,
+        search: Default::default(),
     });
     scenes.push(("pager", app));
 

@@ -350,7 +350,10 @@ async fn mcp(session: &mut Session, action: McpAction) -> Result<i32, String> {
         McpAction::Test { name, json } => {
             let server =
                 session.extensions.server(&name).ok_or_else(|| format!("There's no MCP server called {name}."))?;
-            let launch = recode_extensions::Launch::from_environment();
+            let launch = recode_extensions::Launch::for_project(
+                session.project.clone(),
+                &session.paths.data_dir.join("plugins"),
+            );
             let probe = recode_extensions::probe_with(&server, &launch).await;
             if json {
                 print_json(&probe)?;

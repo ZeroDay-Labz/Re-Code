@@ -947,7 +947,12 @@ pub(crate) fn overlay_area(area: Rect, wanted_width: u16, wanted_height: u16) ->
 fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     let Some(overlay) = app.overlay.clone() else { return };
     match overlay {
-        Overlay::Help => draw_help(frame, area),
+        Overlay::Help { offset } => {
+            let clamped = draw_help(frame, area, offset);
+            if let Some(Overlay::Help { offset }) = &mut app.overlay {
+                *offset = clamped;
+            }
+        }
         Overlay::Context => draw_context(frame, area, app),
         Overlay::Compactions { reports, selected } => draw_compactions(frame, area, &reports, selected),
         Overlay::Memory { files, user_path, project_path, selected } => {
@@ -1006,8 +1011,8 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Overlay::FreeSetup(step) => draw_free_setup(frame, area, &step, app),
         Overlay::CodeBlocks { blocks, selected } => draw_code_blocks(frame, area, &blocks, selected),
         Overlay::ProviderPresets { selected } => draw_provider_presets(frame, area, selected),
-        Overlay::Pager { title, text, is_diff, side_by_side, offset } => {
-            let clamped = draw_pager(frame, area, &title, &text, is_diff, side_by_side, offset);
+        Overlay::Pager { title, text, is_diff, side_by_side, offset, search } => {
+            let clamped = draw_pager(frame, area, &title, &text, is_diff, side_by_side, offset, &search);
             if let Some(Overlay::Pager { offset, .. }) = &mut app.overlay {
                 *offset = clamped;
             }
@@ -1390,7 +1395,12 @@ fn draw_confirm(frame: &mut Frame<'_>, area: Rect, confirm: &ConfirmState) {
     let rect = overlay_area(area, 70, wanted);
     let body_rows = usize::from(rect.height).saturating_sub(2);
     lines.truncate(body_rows.saturating_sub(1).max(1));
-    lines.push(legend(&[("y", "yes"), ("n", "no")], inner_width));
+    let keys: &[(&str, &str)] = if matches!(confirm.command, crate::form::Confirmed::StartRuntime(_)) {
+        &[("y", "yes"), ("a", "yes, and at every launch"), ("n", "no")]
+    } else {
+        &[("y", "yes"), ("n", "no")]
+    };
+    lines.push(legend(keys, inner_width));
     boxed(frame, rect, &confirm.title, lines);
 }
 
@@ -1857,8 +1867,9 @@ fn draw_context(frame: &mut Frame<'_>, area: Rect, app: &App) {
     boxed(frame, rect, "Context", lines);
 }
 
-fn draw_help(frame: &mut Frame<'_>, area: Rect) {
-    let rect = overlay_area(area, 60, u16::try_from(HELP.len()).unwrap_or(0) + 2);
+/// Draws the key list, windowed when the terminal is shorter than the list. Returns the clamped offset.
+fn draw_help(frame: &mut Frame<'_>, area: Rect, offset: usize) -> usize {
+    let rect = overlay_area(area, 60, u16::try_from(HELP.len()).unwrap_or(0) + 3);
     let inner = usize::from(rect.width).saturating_sub(4);
     let mut lines = Vec::new();
     for (keys, what) in HELP {
@@ -1873,7 +1884,16 @@ fn draw_help(frame: &mut Frame<'_>, area: Rect) {
             lines.push(Line::styled(truncate(what, inner), theme::muted()));
         }
     }
-    boxed(frame, rect, "Keys", lines);
+    // Short terminals get a window onto the list, with the position in the title.
+    let body = usize::from(rect.height).saturating_sub(2);
+    let scrolls = lines.len() > body && body > 1;
+    let offset = if scrolls { offset.min(lines.len().saturating_sub(body.saturating_sub(1))) } else { 0 };
+    let title =
+        if scrolls { format!("Keys · {} of {} · ↑↓ scroll", offset + 1, lines.len()) } else { "Keys".to_owned() };
+    let visible: Vec<Line<'static>> =
+        if scrolls { lines.into_iter().skip(offset).take(body.saturating_sub(1)).collect() } else { lines };
+    boxed(frame, rect, &title, visible);
+    offset
 }
 
 fn draw_palette(frame: &mut Frame<'_>, area: Rect, query: &str, selected: usize, app: &App) {
@@ -1915,6 +1935,26 @@ fn draw_palette(frame: &mut Frame<'_>, area: Rect, query: &str, selected: usize,
     }
 }
 
+/// The pager's lines as drawn at this width: a diff (one or two columns) or wrapped text.
+pub(crate) fn pager_lines(text: &str, is_diff: bool, side_by_side: bool, inner: usize) -> Vec<Line<'static>> {
+    if is_diff && side_by_side && inner >= 100 {
+        crate::transcript::render_diff_side_by_side(text, inner)
+    } else if is_diff {
+        render_diff(text, inner, usize::MAX)
+    } else {
+        wrap_plain(text, Style::new(), inner)
+    }
+}
+
+/// The same lines as plain text, for searching.
+pub(crate) fn pager_plain_lines(text: &str, is_diff: bool, side_by_side: bool, inner: usize) -> Vec<String> {
+    pager_lines(text, is_diff, side_by_side, inner)
+        .iter()
+        .map(|line| line.spans.iter().map(|span| span.content.as_ref()).collect::<String>())
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
 fn draw_pager(
     frame: &mut Frame<'_>,
     area: Rect,
@@ -1923,24 +1963,29 @@ fn draw_pager(
     is_diff: bool,
     side_by_side: bool,
     offset: usize,
+    search: &crate::app::PagerSearch,
 ) -> usize {
     let inner = usize::from(area.width).saturating_sub(4);
-    let lines = if is_diff && side_by_side && inner >= 100 {
-        crate::transcript::render_diff_side_by_side(text, inner)
-    } else if is_diff {
-        render_diff(text, inner, usize::MAX)
-    } else {
-        wrap_plain(text, Style::new(), inner)
-    };
+    let lines = pager_lines(text, is_diff, side_by_side, inner);
     let body = usize::from(area.height).saturating_sub(2);
     let offset = offset.min(lines.len().saturating_sub(body));
     let mut heading = String::from(title);
     if lines.len() > body && body > 0 {
         let _ = write!(heading, " · line {} of {}", offset + 1, lines.len());
     }
-    let hint = match (area.width >= 50, is_diff) {
-        (true, true) => "  (q closes · n/p files · s side by side · e edit)",
-        (true, false) => "  (q closes)",
+    if let Some(typing) = &search.typing {
+        let _ = write!(heading, " · /{typing}▏");
+    } else if !search.query.is_empty() {
+        if search.matches.is_empty() {
+            let _ = write!(heading, " · /{}: no matches", search.query);
+        } else {
+            let _ = write!(heading, " · /{} {} of {} (n/N)", search.query, search.current + 1, search.matches.len());
+        }
+    }
+    let hint = match (area.width >= 50, is_diff, search.typing.is_some() || !search.query.is_empty()) {
+        (_, _, true) => "",
+        (true, true, _) => "  (q closes · / search · n/p files · s side by side · e edit)",
+        (true, false, _) => "  (q closes · / search)",
         _ => "",
     };
     heading.push_str(hint);
