@@ -31,10 +31,15 @@ const KEEP_TAIL_MESSAGES: usize = 8;
 pub fn read_result_tool() -> ToolDefinition {
     ToolDefinition {
         name: READ_RESULT.to_owned(),
-        description: "Show an earlier tool result in full that was shortened to save space. Give its handle, \
-                      such as r3, from the note that replaced it."
+        description: "Show an earlier tool result that was shortened to save space. Give its handle, such as r3, \
+                      from the note that replaced it, and the line to start from (offset, from 1) to page through a \
+                      long one; each answer says where the next part starts."
             .to_owned(),
-        parameters: json!({"type": "object", "properties": {"handle": {"type": "string"}}, "required": ["handle"]}),
+        parameters: json!({
+            "type": "object",
+            "properties": {"handle": {"type": "string"}, "offset": {"type": "integer", "minimum": 1}},
+            "required": ["handle"]
+        }),
     }
 }
 
@@ -148,15 +153,16 @@ pub fn ledger(
         let order = match kind {
             ComponentKind::System => 0,
             ComponentKind::ProjectInstructions => 1,
-            ComponentKind::SkillsIndex => 2,
-            ComponentKind::InvokedSkill => 3,
-            ComponentKind::McpNote => 4,
-            ComponentKind::ToolDefinitions => 5,
-            ComponentKind::Conversation => 6,
-            ComponentKind::Summary => 7,
-            ComponentKind::ToolResults => 8,
-            ComponentKind::Elided => 9,
-            ComponentKind::Images => 10,
+            ComponentKind::Memory => 2,
+            ComponentKind::SkillsIndex => 3,
+            ComponentKind::InvokedSkill => 4,
+            ComponentKind::McpNote => 5,
+            ComponentKind::ToolDefinitions => 6,
+            ComponentKind::Conversation => 7,
+            ComponentKind::Summary => 8,
+            ComponentKind::ToolResults => 9,
+            ComponentKind::Elided => 10,
+            ComponentKind::Images => 11,
         };
         let entry = chars_by_part.entry(order).or_insert((kind, 0, 0));
         entry.1 += chars;
@@ -318,11 +324,65 @@ impl Limits {
     }
 }
 
+/// Lines `from` (1-based) onwards of `text`, at most `max_chars`, and the line after the last one
+/// given when the text goes on.
+#[must_use]
+pub fn page(text: &str, from: usize, max_chars: usize) -> (String, usize, Option<usize>) {
+    let total = text.lines().count();
+    let mut out = String::new();
+    let mut last = from.saturating_sub(1);
+    for (index, line) in text.lines().enumerate().skip(from.saturating_sub(1)) {
+        if out.chars().count() + line.chars().count() + 1 > max_chars && last >= from {
+            break;
+        }
+        // A single line longer than the whole allowance is cut, not skipped.
+        let line: String = line.chars().take(max_chars).collect();
+        out.push_str(&line);
+        out.push('\n');
+        last = index + 1;
+    }
+    (out, total, (last < total).then_some(last + 1))
+}
+
+fn is_clipped(content: &str) -> bool {
+    content.contains("to fit the context window. The rest is result r")
+}
+
+/// Cuts every tool result longer than `max_chars` to its first lines, keeping the whole of it under a
+/// handle the model can page through with `read_result`. A single result never takes more than its
+/// share of the window this way, however recent. Returns how many were cut.
+pub fn clip(messages: &mut [Message], elided: &mut BTreeMap<String, String>, max_chars: usize) -> usize {
+    let mut count = 0;
+    for message in messages.iter_mut().filter(|m| m.role == Role::Tool) {
+        if message.content.chars().count() <= max_chars || is_elided(&message.content) || is_clipped(&message.content) {
+            continue;
+        }
+        let handle = format!("r{}", elided.len() + 1);
+        let original = std::mem::take(&mut message.content);
+        let (head, total, next) = page(&original, 1, max_chars.saturating_sub(300).max(200));
+        let next = next.unwrap_or(total);
+        message.content = format!(
+            "{head}[re-code cut this result at line {} of {total} to fit the context window. The rest is result \
+             {handle}: call read_result with \"{handle}\" and offset {next}. For a file, reading the part you need \
+             (read with offset and limit) is cheaper.]",
+            next.saturating_sub(1)
+        );
+        elided.insert(handle, original);
+        count += 1;
+    }
+    count
+}
+
 /// Replaces old, long tool results with handles. Returns how many were elided.
 pub fn elide(messages: &mut [Message], elided: &mut BTreeMap<String, String>) -> usize {
+    elide_keeping(messages, elided, KEEP_RECENT_RESULTS)
+}
+
+/// [`elide`], keeping the `keep` most recent results whole.
+pub fn elide_keeping(messages: &mut [Message], elided: &mut BTreeMap<String, String>, keep: usize) -> usize {
     let results: Vec<usize> =
         messages.iter().enumerate().filter(|(_, m)| m.role == Role::Tool).map(|(index, _)| index).collect();
-    let old = results.len().saturating_sub(KEEP_RECENT_RESULTS);
+    let old = results.len().saturating_sub(keep);
     let mut count = 0;
     for &index in &results[..old] {
         let message = &messages[index];

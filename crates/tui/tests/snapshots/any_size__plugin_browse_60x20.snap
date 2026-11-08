@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+╭ Marketplace claude-plugins-official ─────────────────────╮
+│ Filter  ▏   3 of 3                                       │
+│                                                          │
+│ ❯ context7   development                                 │
+│     Upstash Context7 MCP server for documentation looku… │
+│   frontend-design  1.1.1   development                   │
+│     Frontend design skill for UI/UX implementation       │
+│   npm-thing   tools                                      │
+│     can't be installed: this source runs code on instal… │
+│                                                          │
+│ enter install  ↑↓ choose  type to filter  esc cancel     │
+│                                                          │
+│                                                          │
+╰──────────────────────────────────────────────────────────╯
+ │                                                        │
+ ╰────────────────────────────────────────────────────────╯
+ i install  b browse  s search  m marketplace  space on/off

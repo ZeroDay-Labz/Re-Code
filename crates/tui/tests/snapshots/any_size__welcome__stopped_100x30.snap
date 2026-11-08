@@ -7,7 +7,7 @@ expression: "screen(&draw(app, width, height))"
                                   █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
                                  a coding agent for your own machine
 
-  Home │ Models 0 │ Runtimes │ Providers │ MCP │ Skills │ Tools │ Settings │
+  Home │ Models 0 │ Runtimes │ Providers │ MCP │ Skills │ Plugins │ Tools │ Settings │
  ╭ Ollama ────────────────────────────────────────────────────────────────────────────────────────╮
  │Ollama is installed but stopped                                                                 │
  │                                                                                                │

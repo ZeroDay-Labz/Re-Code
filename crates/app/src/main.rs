@@ -10,6 +10,7 @@ mod hooks;
 mod init;
 mod instructions;
 mod logging;
+mod memory;
 mod paths;
 mod permissions;
 mod plan_tool;
@@ -62,6 +63,10 @@ struct Cli {
     /// With --print: the most tool calls in one turn (the default is 24).
     #[arg(long, value_name = "N", requires = "print")]
     max_turns: Option<usize>,
+
+    /// Don't use or change re-code's memory for this run (its index stays out of the prompt).
+    #[arg(long)]
+    no_memory: bool,
 
     /// With --print: tools that may run without asking, by name (others that would ask are denied).
     #[arg(long, value_delimiter = ',', value_name = "TOOL", requires = "print")]
@@ -144,7 +149,15 @@ async fn main() -> Result<()> {
                 anyhow::bail!("--print needs a prompt (or `-` with the prompt on stdin).");
             }
             let permission_mode = parse_permission_mode(cli.permission_mode.as_deref())?;
-            let link = chat::spawn(paths, ollama_url, config.ollama.num_ctx, cli.resume, cli.add_dir, cli.max_turns);
+            let link = chat::spawn(
+                paths,
+                ollama_url,
+                config.ollama.num_ctx,
+                cli.resume,
+                cli.add_dir,
+                cli.max_turns,
+                cli.no_memory,
+            );
             let options = headless::Options {
                 prompt,
                 format: cli.output_format,
@@ -162,7 +175,8 @@ async fn main() -> Result<()> {
                 );
             }
             let theme = config.theme()?;
-            let link = chat::spawn(paths, ollama_url, config.ollama.num_ctx, cli.resume, cli.add_dir, None);
+            let link =
+                chat::spawn(paths, ollama_url, config.ollama.num_ctx, cli.resume, cli.add_dir, None, cli.no_memory);
             recode_tui::run_interactive(link, theme).await?;
         }
     }

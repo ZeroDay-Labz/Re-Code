@@ -95,8 +95,8 @@ impl FormState {
                     field("Name", "Letters, numbers, - and _.", String::new()),
                     field("When to use it", "The model reads this to decide when the skill applies.", String::new()),
                     field(
-                        "Or import from",
-                        "A Git URL or local folder. Fill this to import instead of writing one.",
+                        "Or install from",
+                        "official/security/godmode, a name, owner/repo/folder, a GitHub or skills.sh link, or a folder. It's fetched and shown before anything is installed.",
                         String::new(),
                     ),
                 ],
@@ -105,9 +105,12 @@ impl FormState {
             },
             HomeTab::Tools => Self::tool_form("New tool", None, "", "", "", "", true),
             HomeTab::Providers => Self::provider_form("Add provider", None, "", ProviderKind::Anthropic, "", true),
-            HomeTab::Models | HomeTab::Home | HomeTab::Settings | HomeTab::Runtimes | HomeTab::Mcp => {
-                Self::server_form("Add MCP server", None, "", "", "", true)
-            }
+            HomeTab::Models
+            | HomeTab::Home
+            | HomeTab::Settings
+            | HomeTab::Runtimes
+            | HomeTab::Mcp
+            | HomeTab::Plugins => Self::server_form("Add MCP server", None, "", "", "", true),
         }
     }
 
@@ -314,7 +317,7 @@ impl FormState {
                 if import.is_empty() {
                     validate_name("skill", value(0).trim()).and_then(|()| {
                         if value(1).trim().is_empty() {
-                            Err("Describe when this skill should be used, or fill in 'Or import from'.".to_owned())
+                            Err("Describe when this skill should be used, or fill in 'Or install from'.".to_owned())
                         } else {
                             Ok(ExtensionCommand::CreateSkill {
                                 name: value(0).trim().to_owned(),
@@ -323,7 +326,7 @@ impl FormState {
                         }
                     })
                 } else {
-                    Ok(ExtensionCommand::AddSkillFromLink(import.to_owned()))
+                    Ok(ExtensionCommand::StageSkill(import.to_owned()))
                 }
             }
         };
@@ -354,6 +357,13 @@ pub enum Confirmed {
     TrustProject,
     /// Write the `RE-CODE.md` that `/init` previewed.
     WriteInit,
+    /// Delete a saved session (its messages and snapshot) by id.
+    DeleteSession(String),
+    /// Delete a memory re-code saved.
+    ForgetMemory {
+        scope: String,
+        name: String,
+    },
 }
 
 impl From<ExtensionCommand> for Confirmed {

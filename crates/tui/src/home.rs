@@ -154,6 +154,7 @@ pub fn draw_home(frame: &mut Frame<'_>, area: Rect, app: &mut App, selected: usi
 /// The sizes `Context size` steps through, in tokens.
 pub const CONTEXT_CHOICES: [u32; 6] = [4096, 8192, 16384, 32768, 65536, 131_072];
 pub const NOTIFICATION_CHOICES: [&str; 4] = ["off", "bell", "desktop", "both"];
+pub const MEMORY_CHOICES: [&str; 3] = ["on", "read-only", "off"];
 /// Minutes of quiet before an idle compaction, or off.
 pub const IDLE_CHOICES: [&str; 5] = ["off", "5", "15", "30", "60"];
 
@@ -181,6 +182,8 @@ pub enum SettingKind {
     IdleCompaction,
     Notifications,
     LineNumbers,
+    /// Whether re-code keeps memory between sessions.
+    Memory,
     /// An API key for this provider (preset name), and whether one is stored.
     ApiKey(String, bool),
 }
@@ -234,6 +237,12 @@ pub fn settings_rows(app: &App) -> Vec<SettingRow> {
             value: setting("notifications", "both"),
             hint: "← → changes: off, bell, desktop, both",
             kind: SettingKind::Notifications,
+        },
+        SettingRow {
+            label: "Memory",
+            value: setting("memory", "on"),
+            hint: "← → changes: on (re-code saves what it learns; /memory lists it), read-only, off",
+            kind: SettingKind::Memory,
         },
         SettingRow {
             label: "Line numbers in code",

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc::UnboundedSender;
 
 /// What a snapshot holds: everything needed to carry on exactly where the session left off.
@@ -64,30 +65,50 @@ enum Record {
     },
     /// Start a fresh session on the next event.
     New,
+    /// Remove a saved session; the list of sessions is sent again afterwards.
+    Delete(SessionId),
 }
 
 /// Writes the session to the store in the background.
 #[derive(Clone)]
 pub struct Recorder {
     sender: Option<mpsc::Sender<Record>>,
+    /// The session being written, mirrored from the writer so the driver can tell whether a
+    /// deleted session is the open one.
+    current: Arc<Mutex<Option<SessionId>>>,
 }
 
 impl Recorder {
     /// A recorder that saves nothing, for when the database couldn't be opened.
     #[must_use]
     pub fn disabled() -> Self {
-        Self { sender: None }
+        Self { sender: None, current: Arc::new(Mutex::new(None)) }
+    }
+
+    /// The session being written to, once the first event created or continued one.
+    #[must_use]
+    pub fn current(&self) -> Option<SessionId> {
+        self.current.lock().ok().and_then(|current| *current)
+    }
+
+    /// Deletes a saved session. The writer owns the database connection, so it does the deleting and
+    /// then sends the fresh list.
+    pub fn delete(&self, session: SessionId) {
+        self.send(Record::Delete(session));
     }
 
     /// Starts the writer. The session itself is created on the first event, so opening re-code and
     /// leaving doesn't leave empty sessions behind.
     pub fn start(database: PathBuf, project: String, ui: UnboundedSender<UiEvent>) -> Self {
         let (sender, receiver) = mpsc::channel();
+        let current = Arc::new(Mutex::new(None));
+        let mirror = current.clone();
         let spawned = std::thread::Builder::new().name("session-writer".to_owned()).spawn(move || {
-            Writer { database, project, ui, store: None, session: None, title: None, failed: false }.run(&receiver)
+            Writer { database, project, ui, store: None, session: None, title: None, failed: false, current: mirror }
+                .run(&receiver)
         });
         match spawned {
-            Ok(_) => Self { sender: Some(sender) },
+            Ok(_) => Self { sender: Some(sender), current },
             Err(error) => {
                 tracing::warn!(%error, "can't start the session writer");
                 Self::disabled()
@@ -139,9 +160,17 @@ struct Writer {
     title: Option<String>,
     /// Report a failure once, not on every event.
     failed: bool,
+    current: Arc<Mutex<Option<SessionId>>>,
 }
 
 impl Writer {
+    fn set_session(&mut self, session: Option<SessionId>) {
+        self.session = session;
+        if let Ok(mut current) = self.current.lock() {
+            *current = session;
+        }
+    }
+
     fn run(mut self, receiver: &mpsc::Receiver<Record>) {
         while let Ok(first) = receiver.recv() {
             // Take whatever else is already waiting, so a burst of tokens is one transaction.
@@ -217,12 +246,33 @@ impl Writer {
                 }
             }
             Record::Continue { session, title } => {
-                self.session = Some(session);
+                self.set_session(Some(session));
                 self.title = Some(title);
             }
             Record::New => {
-                self.session = None;
+                self.set_session(None);
                 self.title = None;
+            }
+            Record::Delete(session) => {
+                let result = self.store().and_then(|store| store.delete_session(session).map_err(|e| e.to_string()));
+                match result {
+                    Ok(true) => {
+                        if self.session == Some(session) {
+                            self.set_session(None);
+                            self.title = None;
+                        }
+                        let _ = self.ui.send(UiEvent::Notice("Deleted the chat.".to_owned()));
+                    }
+                    Ok(false) => {
+                        let _ = self.ui.send(UiEvent::Notice("That chat was already gone.".to_owned()));
+                    }
+                    Err(error) => {
+                        let _ = self.ui.send(UiEvent::Notice(format!("Couldn't delete the chat: {error}")));
+                    }
+                }
+                let project = self.project.clone();
+                let summaries = self.store().ok().map(|store| crate::chat::session_summaries(Some(store), &project));
+                let _ = self.ui.send(UiEvent::Sessions(summaries.unwrap_or_default()));
             }
         }
     }
@@ -256,7 +306,7 @@ impl Writer {
                     let project = self.project.clone();
                     let record =
                         self.store()?.create_session(&project, UnixMillis::now()).map_err(|e| e.to_string())?;
-                    self.session = Some(record.id);
+                    self.set_session(Some(record.id));
                     record.id
                 }
             };

@@ -1,0 +1,38 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+
+                                            █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
+                                            █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
+                                            █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
+                                           a coding agent for your own machine
+
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Plugins 2 │ Tools 2 │ Settings │
+  ╭ Plugins and marketplaces ────────────────────────────────────────────────────────────────────────────────────────╮
+  │❯ ● context7           claude-plugins-official @ 2c5958ec · 2 parts │ context7                                    │
+  │  ◌ better-session-appea…  community @ 3ee27002 · nothing runs here │ Upstash Context7 MCP server for up-to-date  │
+  │  ⌂ claude-plugins-official               marketplace · 317 plugins │ documentation lookup.                       │
+  │  ◇ rust-analyzer-lsp@claude-plugi…  installed in Claude Code 1.0.0 │ context7 [claude-plugins-official] pinned @ │
+  │                                                                    │ 2c5958ec · maintained by Upstash            │
+  │                                                                    │ brings 1 skill, 1 MCP server, 1 hook (not   │
+  │                                                                    │ loaded)                                     │
+  │                                                                    │ Version 1.0.0                               │
+  │                                                                    │                                             │
+  │                                                                    │ • MCP server context7 ·                     │
+  │                                                                    │ https://mcp.context7.com/mcp                │
+  │                                                                    │ • command /setup (as a skill)               │
+  │                                                                    │ · hook on session_start · converted, not    │
+  │                                                                    │ loaded                                      │
+  │                                                                    │ Converted hooks are in hooks.converted.toml │
+  │                                                                    │ inside the plugin; copy what you want into  │
+  │                                                                    │ your hooks.toml.                            │
+  │                                                                    │                                             │
+  │                                                                    │ /home/someone/.local/share/re-code/plugins/c│
+  │                                                                    │ ontext7                                     │
+  │                                                                    │ Space switches it on or off, u checks for   │
+  │                                                                    │ an update, d removes it.                    │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
+  Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
+      i install  b browse  s search  m marketplace  space on/off  u update  d remove  tab next  ^R rescan  ^C quit

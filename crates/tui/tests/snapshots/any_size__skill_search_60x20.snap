@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+ ╭ Skills ────────────────────────────────────────────────╮
+╭ Search skill hubs ───────────────────────────────────────╮
+│ Search  pdf▏                                             │
+│                                                          │
+│ ❯ pdf   community                                        │
+│     Work with PDF files.  ·  anthropics/skills/skills/p… │
+│   pdf-forms   official                                   │
+│     Fill PDF forms from structured data.  ·  NousResear… │
+│                                                          │
+│ enter install  ↑↓ choose  type to search again           │
+│                                                          │
+│                                                          │
+╰──────────────────────────────────────────────────────────╯
+ │                                                        │
+ │                                                        │
+ ╰────────────────────────────────────────────────────────╯
+ a add  i install  e edit  space on/off  d delete  s search

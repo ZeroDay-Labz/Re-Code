@@ -170,6 +170,21 @@ and Enter shows the originals. After a summary the task list, up to five recentl
 summary in one turn fails the turn with an explanation. Measured on `gpt-oss:20b`: ~3.8k → ~1k tokens
 (estimated) for a 60-message history, with every heading filled correctly.
 
+## One result never fills the window (2026-11-07)
+
+A user on a 32k window asked qwen3.8:27b to review the whole project. A handful of whole-file reads (each up
+to 64 KiB, about 20k tokens) sat in the latest steps, which compaction kept whole, so the conversation stayed
+over budget and every later message was refused. Three changes fix it:
+
+- `read` takes `offset` and `limit` (lines), and says where the file goes on when it stops early.
+- Before every request, a tool result over a quarter of the budget is cut to its first lines. The whole text
+  stays under a handle, and the note tells the model to page through it with `read_result` and an `offset`.
+  `read_result` itself answers in parts of the same size.
+- If a request is still over budget after summarising, the newest results go behind handles too.
+
+Covered by `huge_recent_results_are_cut_to_fit_and_the_conversation_carries_on`. Live on gpt-oss:20b with a
+32k window, a review of the three largest files paged through them, compacted twice and finished.
+
 ## Selective retrieval and repeated content
 
 - Files are read by the agent as needed, not preloaded.
@@ -177,7 +192,25 @@ summary in one turn fails the turn with an explanation. Measured on `gpt-oss:20b
 - If an unchanged file is read again, the model gets a short reference to the earlier result, confirmed
   by content hash.
 
-## Memory (Milestone 2)
+## Memory (implemented 2026-11-07)
+
+re-code keeps memory itself (`crates/app/src/memory.rs`). The model saves facts with the `memory` tool while
+it works (`list`, `read`, `save`, `forget`), and later sessions get them back. Each memory is a Markdown file
+with `name`, `description` and `type` (user, feedback, project, reference) in its front matter. The files live
+in `<data dir>/memory/<project hash>/` for this project and `<data dir>/memory/user/` for every project,
+never in the repository. `MEMORY.md` beside them is an index for people, rewritten after each change. What
+the model sees is the "Memory" part of the system prompt: a short paragraph on when to save, then one line per
+memory, built from the files themselves (a hand edit counts at once), capped at about 2k tokens. It is its own
+row in `/context`. A save or forget asks first, like any lasting change: `a` allows it for the session, `p` for
+the project. Reading never asks. Plan mode and helper tasks can only read. Nothing that looks like a secret is
+saved, and a memory holds at most 8,000 characters. Settings has "Memory: on, read-only, off", and
+`--no-memory` turns it off for one run. `/memory` lists memories beside the instruction files; Enter edits
+one and `d` forgets it.
+
+**Not built:** keyword search over many memories (the whole index is sent, which is fine at tens of
+memories), and expiry of stale ones.
+
+The earlier design, kept for when the index outgrows the prompt:
 
 **Storage:** SQLite with FTS5 keyword search. **Embeddings aren't needed at first.** Keyword search over a
 modest set of notes is predictable and needs no model. It can be added if retrieval quality proves

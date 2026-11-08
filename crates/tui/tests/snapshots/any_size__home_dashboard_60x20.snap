@@ -21,4 +21,4 @@ expression: "screen(&draw(app, width, height))"
  │                                                        │
  │                                                        │
  ╰────────────────────────────────────────────────────────╯
-     enter open  ↑↓ choose  tab next  ^R rescan  ^C quit
+  enter open  ↑↓ choose  d delete chat  tab next  ^R rescan

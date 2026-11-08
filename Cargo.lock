@@ -2695,6 +2695,7 @@ dependencies = [
 name = "recode-extensions"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
  "http",
  "recode-core",
  "reqwest",
@@ -2706,6 +2707,7 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+ "wiremock",
 ]
 
 [[package]]

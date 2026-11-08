@@ -7,7 +7,7 @@ expression: "screen(&draw(app, width, height))"
                                   █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
                                  a coding agent for your own machine
 
-  Home │ Models │ Runtimes │ Providers │ MCP │ Skills │ Tools │ Settings │
+  Home │ Models │ Runtimes │ Providers │ MCP │ Skills │ Plugins │ Tools │ Settings │
  ╭ Models ────────────────────────────────────────────────────────────────────────────────────────╮
  │⠋ Looking for models…                                                                           │
  │                                                                                                │

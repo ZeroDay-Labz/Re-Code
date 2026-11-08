@@ -173,6 +173,16 @@ impl Store {
         Ok(())
     }
 
+    /// Removes a session with its events, snapshot and compactions. Nothing else refers to it.
+    pub fn delete_session(&self, id: SessionId) -> Result<bool, StoreError> {
+        let key = id.to_string();
+        self.conn.execute("DELETE FROM compactions WHERE session_id = ?1", [&key])?;
+        self.conn.execute("DELETE FROM snapshots WHERE session_id = ?1", [&key])?;
+        self.conn.execute("DELETE FROM events WHERE session_id = ?1", [&key])?;
+        let removed = self.conn.execute("DELETE FROM sessions WHERE id = ?1", [&key])?;
+        Ok(removed > 0)
+    }
+
     /// Records a new session.
     pub fn create_session(&self, project_path: &str, at: UnixMillis) -> Result<SessionRecord, StoreError> {
         let id = SessionId::new();
@@ -605,6 +615,13 @@ mod tests {
         store.save_snapshot(old.id, "old, continued", "[1,1]", UnixMillis(40)).unwrap();
         let latest = store.latest_snapshot("/p").unwrap().unwrap();
         assert_eq!((latest.session, latest.conversation.as_str()), (old.id, "[1,1]"));
+        // Deleting a session takes its snapshot with it and leaves the others alone.
+        assert!(store.delete_session(old.id).unwrap());
+        assert!(!store.delete_session(old.id).unwrap(), "already gone");
+        let listed: Vec<String> = store.snapshots_for_project("/p").unwrap().into_iter().map(|s| s.title).collect();
+        assert_eq!(listed, ["new"]);
+        assert_eq!(store.sessions_for_project("/p").unwrap().len(), 1);
+        assert_eq!(store.latest_snapshot("/q").unwrap().unwrap().title, "other");
     }
 
     #[test]

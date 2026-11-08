@@ -9,21 +9,21 @@ expression: "screen(&draw(app, width, height))"
 │          }                                                                                       │
 │          Err(error) => return Err(error),                                                        │
 │      }                                                                                           │
-│  }                                                                                               │
-│       ╭ Instruction files ───────────────────────────────────────────────────────────────╮       │
-│ Attemp│ ❯ /home/someone/.config/re-code/RE-CODE.md                           ~180 tokens │       │
-│ ──────│     yours                                                                        │       │
-│ 1     │   /home/someone/code/api-server/AGENTS.md                       off until /trust │       │
-│ 2     │     project                                                                      │       │
-│ 3     │   /home/someone/code/api…  48 KB is too long to send; only its path is mentioned │       │
-│       │     project                                                                      │       │
-│ Things│                                                                                  │       │
-│       │ Yours: /home/someone/.config/re-code/RE-CODE.md                                  │       │
-│ 1. MAX│ Project: /home/someone/code/api-server/RE-CODE.md                                │       │
-│ 2. The│ enter edit  n new for this project  u yours  esc close                           │       │
-│   • Wo│                                                                                  │       │
-│       ╰──────────────────────────────────────────────────────────────────────────────────╯       │
-│ │ Try resizing the window now. Text, this table and the code above all reflow. 世界 and 🦀 are   │
+│  }    ╭ Instructions and memory ─────────────────────────────────────────────────────────╮       │
+│       │ ❯ /home/someone/.config/re-code/RE-CODE.md                           ~180 tokens │       │
+│ Attemp│     yours                                                                        │       │
+│ ──────│   /home/someone/code/api-server/AGENTS.md                       off until /trust │       │
+│ 1     │     project                                                                      │       │
+│ 2     │   /home/someone/code/api…  48 KB is too long to send; only its path is mentioned │       │
+│ 3     │     project                                                                      │       │
+│       │   fedora-commands                                                     ~40 tokens │       │
+│ Things│     remembered · project · feedback: Which package manager to use                │       │
+│       │                                                                                  │       │
+│ 1. MAX│ Yours: /home/someone/.config/re-code/RE-CODE.md                                  │       │
+│ 2. The│ Project: /home/someone/code/api-server/RE-CODE.md                                │       │
+│   • Wo│ enter edit  n new for this project  u yours  esc close                           │       │
+│       │                                                                                  │       │
+│ │ Try ╰──────────────────────────────────────────────────────────────────────────────────╯ are   │
 │ │ here to test wide characters.                                                                  │
 │                                                                                                  │
 │ ── 4 tools · 6.0k in (5.7k cached) / 420 out ──                                                  │

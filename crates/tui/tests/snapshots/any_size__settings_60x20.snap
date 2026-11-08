@@ -14,11 +14,11 @@ expression: "screen(&draw(app, width, height))"
  │  Context size (local models)             16384 tokens  │
  │  Idle compaction                                  off  │
  │  Notifications                                   both  │
+ │  Memory                                            on  │
  │  Line numbers in code                             off  │
  │                                                        │
  │API keys ────────────────────────────────────────────── │
  │  openrouter                                    no key  │
  │  opencode-zen                                  no key  │
- │  ollama-cloud                                  no key  │
  ╰────────────────────────────────────────────────────────╯
  enter change  ←→ adjust  ↑↓ choose  d remove key  tab next

@@ -1,0 +1,38 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+
+                                            █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
+                                            █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
+                                            █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
+                                           a coding agent for your own machine
+
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Plugins 2 │ Tools 2 │ Settings │
+  ╭ Skills ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │❯ ● review                                                    yours │ review                                      │
+  │  ○ from-repo                                               project │ Use this when something needs doing,        │
+  │  ● borrowed   ╭ Install a skill ─────────────────────────────────────────────────────────────────╮h.             │
+  │  ✗ damaged    │ godmode   official   pinned @ 4134cbef                                           │               │
+  │               │ Run security tooling with every safeguard explained. Use for authorised testing. │               │
+  │               │ declares no hooks or middleware; asks for tools: Bash; ships a script            │ (estimated).  │
+  │               │ (scripts/run.py); uses env vars: GODMODE_TOKEN · 7 files · 13 kB · ~3.4k tokens  │/skills/review/│
+  │               │ when loaded                                                                      │               │
+  │               │ scan: caution — SKILL.md:41 runs a package installer, which executes code from   │               │
+  │               │ the network (pip install ruamel.yaml)                                            │s when you're  │
+  │               │       link is a symbolic link, so it wasn't taken; the skill may expect it       │ with Ctrl+L.  │
+  │               │ skills.sh's API needs a login, so the files came from the GitHub repository it   │               │
+  │               │ points at.                                                                       │               │
+  │               │ Location  /home/someone/.config/re-code/skills/godmode                           │               │
+  │               │                                                                                  │               │
+  │               │ Enable now?                                                                      │               │
+  │               │ y yes  k keep off  n discard  r read SKILL.md                                    │               │
+  │               ╰──────────────────────────────────────────────────────────────────────────────────╯               │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
+  Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
+           a add  i install  e edit  space on/off  d delete  s search  u update  tab next  ^R rescan  ^C quit

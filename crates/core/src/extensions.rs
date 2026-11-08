@@ -354,6 +354,8 @@ pub enum SkillSource {
     Project,
     /// Found in Claude Code's directory. Read-only here.
     ClaudeCode,
+    /// Part of an installed plugin (`Skill.plugin` names it). Removed with the plugin.
+    Plugin,
 }
 
 /// What a static scan of a skill found (`recode_extensions::scan`). It can't prove a skill safe; it
@@ -442,6 +444,330 @@ pub struct Skill {
     /// For project skills: whether the folder's configuration has been trusted.
     #[serde(default)]
     pub trusted: bool,
+    /// For skills installed from a hub: where from and which commit, so they can be updated.
+    #[serde(default)]
+    pub installed_from: Option<InstalledSource>,
+    /// The plugin this skill belongs to, for `SkillSource::Plugin`.
+    #[serde(default)]
+    pub plugin: Option<String>,
+}
+
+/// One thing a plugin brings. Skills and MCP servers run here; the rest is listed so the user knows
+/// what the plugin would have done elsewhere.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum PluginPart {
+    /// A skill folder (`skills/<name>/SKILL.md`) or a Claude Code command file (`commands/<name>.md`).
+    Skill { name: String, path: String, scan: Verdict, command: bool },
+    /// An MCP server from `mcp.json` or `.mcp.json`.
+    Mcp { name: String, connection: String },
+    /// A hook that was translated into re-code's format but is not loaded until the user copies it.
+    Hook { event: String, command: String, converted: bool },
+    /// Something re-code has no way to run: Python tools, desktop plugins, agents, LSP servers…
+    NotRunHere { what: String, detail: String },
+}
+
+impl PluginPart {
+    /// One line for a list.
+    #[must_use]
+    pub fn describe(&self) -> String {
+        match self {
+            Self::Skill { name, command: false, scan, .. } => match scan {
+                Verdict::Clean => format!("skill {name}"),
+                other => format!("skill {name} · {}", other.label()),
+            },
+            Self::Skill { name, command: true, .. } => format!("command /{name} (as a skill)"),
+            Self::Mcp { name, connection } => format!("MCP server {name} · {connection}"),
+            Self::Hook { event, converted: true, .. } => format!("hook on {event} · converted, not loaded"),
+            Self::Hook { event, converted: false, .. } => format!("hook on {event} · no equivalent here"),
+            Self::NotRunHere { what, detail } if detail.is_empty() => format!("{what} · not run here"),
+            Self::NotRunHere { what, detail } => format!("{what} · not run here ({detail})"),
+        }
+    }
+
+    /// Whether re-code puts this part to use.
+    #[must_use]
+    pub fn runs_here(&self) -> bool {
+        matches!(self, Self::Skill { .. } | Self::Mcp { .. })
+    }
+}
+
+/// An installed plugin: a folder under re-code's data directory with a source record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct Plugin {
+    pub name: String,
+    pub description: String,
+    pub version: Option<String>,
+    pub maintainer: Option<String>,
+    /// `official`, `verified`, `community` (Hermes tiers), a marketplace name, `github` or `local`.
+    pub label: String,
+    pub source: InstalledSource,
+    pub directory: String,
+    pub enabled: bool,
+    pub parts: Vec<PluginPart>,
+}
+
+impl Plugin {
+    /// Hermes' header line: `name [tier] pinned @ sha8 · maintained by …`.
+    #[must_use]
+    pub fn header(&self) -> String {
+        let mut text = format!("{} [{}]", self.name, self.label);
+        if self.source.sha.len() >= 8 {
+            text.push_str(&format!(" pinned @ {}", &self.source.sha[..8]));
+        }
+        if let Some(maintainer) = &self.maintainer {
+            text.push_str(&format!(" · maintained by {maintainer}"));
+        }
+        text
+    }
+
+    /// Hermes' capability sentence, from what the files hold.
+    #[must_use]
+    pub fn capability_sentence(&self) -> String {
+        let count = |pred: &dyn Fn(&PluginPart) -> bool| self.parts.iter().filter(|part| pred(part)).count();
+        let skills = count(&|part| matches!(part, PluginPart::Skill { .. }));
+        let servers = count(&|part| matches!(part, PluginPart::Mcp { .. }));
+        let hooks = count(&|part| matches!(part, PluginPart::Hook { .. }));
+        let other = count(&|part| matches!(part, PluginPart::NotRunHere { .. }));
+        if skills + servers + hooks + other == 0 {
+            return "declares no tools, hooks, middleware, or env vars; nothing here runs in re-code".to_owned();
+        }
+        let mut parts = Vec::new();
+        if skills > 0 {
+            parts.push(if skills == 1 { "1 skill".to_owned() } else { format!("{skills} skills") });
+        }
+        if servers > 0 {
+            parts.push(if servers == 1 { "1 MCP server".to_owned() } else { format!("{servers} MCP servers") });
+        }
+        if hooks > 0 {
+            parts.push(if hooks == 1 {
+                "1 hook (not loaded)".to_owned()
+            } else {
+                format!("{hooks} hooks (not loaded)")
+            });
+        }
+        if other > 0 {
+            parts.push(if other == 1 {
+                "1 part that doesn't run here".to_owned()
+            } else {
+                format!("{other} parts that don't run here")
+            });
+        }
+        if skills + servers == 0 {
+            format!("{}; nothing here runs in re-code", parts.join(", "))
+        } else {
+            format!("brings {}", parts.join(", "))
+        }
+    }
+}
+
+/// A plugin fetched into staging and examined, waiting for the decision.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct PluginPreview {
+    pub staging: String,
+    pub plugin: Plugin,
+    pub files: usize,
+    pub bytes: u64,
+    /// Where it will live.
+    pub location: String,
+    pub note: Option<String>,
+    /// Set when a plugin of this name is installed: an update, with the files that change.
+    pub replaces: Option<Replacing>,
+}
+
+/// What staging a plugin came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PluginOutcome {
+    Preview(Box<PluginPreview>),
+    UpToDate { name: String, sha: String },
+    Failed { tap: String, error: String },
+}
+
+/// One plugin offered by a marketplace or catalog, and how re-code would install it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct PluginListing {
+    /// What to stage to install it.
+    pub tap: String,
+    pub name: String,
+    pub description: String,
+    /// Hermes tier, or the marketplace's category.
+    pub label: String,
+    pub version: Option<String>,
+    /// Why it can't be installed, when it can't (an `npm` or `command` source runs code on install).
+    pub unsupported: Option<String>,
+}
+
+/// A Claude Code marketplace re-code follows.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct Marketplace {
+    pub name: String,
+    /// `owner/repo` on GitHub, or a local folder.
+    pub repo: String,
+    /// The commit the manifest was read at (empty for a local folder).
+    #[serde(default)]
+    pub sha: String,
+    #[serde(default)]
+    pub added_at: String,
+    /// How many plugins its manifest lists, when it has been read.
+    #[serde(default)]
+    pub plugin_count: usize,
+}
+
+/// A plugin Claude Code itself has installed, listed read-only so it can be brought over.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct ClaudePluginInfo {
+    /// `name@marketplace` as Claude Code keys it.
+    pub key: String,
+    pub version: Option<String>,
+    /// The folder with the files, which `install` can take as a local tap.
+    pub install_path: String,
+}
+
+/// Where an installed skill came from, as recorded in `.re-code-source.toml` inside its folder.
+/// It lets re-code check for and install an update, and show the pinned commit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct InstalledSource {
+    /// What the user gave, such as `official/security/godmode` or `anthropics/skills/skills/pdf`.
+    pub tap: String,
+    /// `owner/repo` on GitHub, or the host for a single-file install.
+    pub repo: String,
+    /// The folder inside the repository.
+    #[serde(default)]
+    pub path: String,
+    /// The commit the files were taken from (40 hex characters); empty for a local copy.
+    #[serde(default)]
+    pub sha: String,
+    /// `official`, `community`, `skills.sh`, `github`, `file` or `local`.
+    #[serde(default)]
+    pub label: String,
+    /// When it was installed, UTC, like `2026-11-07T19:00:00Z`.
+    #[serde(default)]
+    pub installed_at: String,
+}
+
+impl InstalledSource {
+    /// `official @ 4134cbef`, or `local` when nothing is pinned.
+    #[must_use]
+    pub fn pin_text(&self) -> String {
+        if self.sha.len() >= 8 { format!("{} @ {}", self.label, &self.sha[..8]) } else { self.label.clone() }
+    }
+}
+
+/// What a skill's files declare they need or do, read before installing. The wording follows Hermes
+/// Agent's install summary so people who know it recognise it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct Declares {
+    /// `allowed-tools` from the front matter.
+    pub allowed_tools: Vec<String>,
+    /// Scripts shipped with the skill (anything runnable, or under `scripts/`).
+    pub scripts: Vec<String>,
+    /// Environment variables the instructions or scripts refer to.
+    pub env_vars: Vec<String>,
+}
+
+impl Declares {
+    /// One sentence: "declares no tools, hooks, middleware, or env vars", or what it does declare.
+    #[must_use]
+    pub fn summary(&self) -> String {
+        if self.allowed_tools.is_empty() && self.scripts.is_empty() && self.env_vars.is_empty() {
+            return "declares no tools, hooks, middleware, or env vars".to_owned();
+        }
+        let mut parts = Vec::new();
+        if !self.allowed_tools.is_empty() {
+            parts.push(format!("asks for tools: {}", self.allowed_tools.join(" ")));
+        }
+        if !self.scripts.is_empty() {
+            parts.push(match self.scripts.len() {
+                1 => format!("ships a script ({})", self.scripts[0]),
+                n => format!("ships {n} scripts"),
+            });
+        }
+        if !self.env_vars.is_empty() {
+            parts.push(format!("uses env vars: {}", self.env_vars.join(", ")));
+        }
+        format!("declares no hooks or middleware; {}", parts.join("; "))
+    }
+}
+
+/// What installing an update would change, file by file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct Replacing {
+    /// The commit installed now.
+    pub sha: String,
+    /// Files added, removed or changed (`+ path`, `- path`, `~ path`).
+    pub changed: Vec<String>,
+}
+
+/// A skill fetched into a staging folder and examined, waiting for the user's decision.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct InstallPreview {
+    /// The staged skill folder (under re-code's cache). Committing moves it into place; discarding removes it.
+    pub staging: String,
+    pub name: String,
+    pub description: String,
+    pub source: InstalledSource,
+    /// Every file, relative to the skill folder.
+    pub files: Vec<String>,
+    pub bytes: u64,
+    /// What `SKILL.md` costs when the model loads it, estimated.
+    pub estimated_tokens: u64,
+    pub declares: Declares,
+    pub scan: Verdict,
+    /// Where it will live once installed.
+    pub location: String,
+    /// `SKILL.md` as fetched, for reading before deciding (cut at 64k characters).
+    pub skill_text: String,
+    /// A specification problem that would keep it off (no description, a bad name).
+    pub problem: Option<String>,
+    /// Something to know, such as "skills.sh's API needs a login, so the files came from GitHub".
+    pub note: Option<String>,
+    /// Set when a skill of this name is installed already: this is an update.
+    pub replaces: Option<Replacing>,
+}
+
+/// One skill folder found where several could be meant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct SkillCandidate {
+    /// What to stage to get this one.
+    pub tap: String,
+    /// The folder inside the repository.
+    pub path: String,
+    pub name: String,
+    pub description: String,
+}
+
+/// What staging a skill came to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum InstallOutcome {
+    Preview(Box<InstallPreview>),
+    /// The place holds several skills: pick one.
+    Choose {
+        tap: String,
+        candidates: Vec<SkillCandidate>,
+        note: Option<String>,
+    },
+    /// An update found nothing newer than what's installed.
+    UpToDate {
+        name: String,
+        sha: String,
+    },
+    Failed {
+        tap: String,
+        error: String,
+    },
+}
+
+/// One result of searching a skill hub.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct SkillSearchHit {
+    /// What to stage to install it.
+    pub tap: String,
+    pub name: String,
+    pub description: String,
+    /// `official`, `community`, …
+    pub label: String,
+    pub repo: String,
+    pub path: String,
 }
 
 /// One tool offered by an MCP server.
@@ -524,6 +850,10 @@ pub struct ExtensionsSnapshot {
     pub probing: Vec<String>,
     pub tools: Vec<CustomTool>,
     pub skills: Vec<Skill>,
+    pub plugins: Vec<Plugin>,
+    pub marketplaces: Vec<Marketplace>,
+    /// What Claude Code has installed, read live and read-only.
+    pub claude_plugins: Vec<ClaudePluginInfo>,
     pub providers: Vec<CloudProvider>,
     pub provider_probes: BTreeMap<String, ProviderProbe>,
     /// Providers that have an API key stored in the keyring.
@@ -573,8 +903,39 @@ pub enum ExtensionCommand {
         name: Option<String>,
         link: String,
     },
-    /// Copy or clone a skill from a Git URL or local directory into the user skills.
-    AddSkillFromLink(String),
+    /// Fetch a skill from a hub, GitHub, skills.sh, a `SKILL.md` link or a local folder into a staging
+    /// folder and examine it. The answer is a `InstallOutcome`; nothing is installed yet.
+    StageSkill(String),
+    /// Move a staged skill into place, on or off.
+    CommitInstall {
+        staging: String,
+        enable: bool,
+    },
+    /// Remove a staged skill.
+    DiscardInstall(String),
+    /// Stage the newest version of an installed skill, showing what would change.
+    UpdateSkill(String),
+    /// Search the skill hubs.
+    SearchSkills(String),
+    /// Fetch a plugin (Hermes catalog name, `name@marketplace`, GitHub, or a folder) into staging and examine it.
+    StagePlugin(String),
+    /// Move a staged plugin into place, on or off.
+    CommitPlugin {
+        staging: String,
+        enable: bool,
+    },
+    SetPluginEnabled(String, bool),
+    /// Remove an installed plugin and everything it brought.
+    DeletePlugin(String),
+    /// Stage the newest version of an installed plugin.
+    UpdatePlugin(String),
+    /// Follow a Claude Code marketplace (`owner/repo[@ref]`, a GitHub link, or a folder).
+    AddMarketplace(String),
+    RemoveMarketplace(String),
+    /// List what a marketplace offers (`hermes` for the Hermes catalog).
+    BrowseMarketplace(String),
+    /// Search the Hermes plugin catalog and the followed marketplaces.
+    SearchPlugins(String),
     CreateSkill {
         name: String,
         description: String,

@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+╭ Install a skill ─────────────────────────────────────────╮
+│ anthropics/skills holds 5 skills. Which one?             │
+│                                                          │
+│ ❯ pdf                                                    │
+│     Work with pdf files, from reading to creating them.… │
+│   xlsx                                                   │
+│     Work with xlsx files, from reading to creating them… │
+│   docx                                                   │
+│     Work with docx files, from reading to creating them… │
+│   pptx                                                   │
+│     Work with pptx files, from reading to creating them… │
+│   frontend-design                                        │
+│     Work with frontend-design files, from reading to cr… │
+│                                                          │
+│ enter fetch this one  ↑↓ choose  esc cancel              │
+│                                                          │
+╰──────────────────────────────────────────────────────────╯
+ ╰────────────────────────────────────────────────────────╯
+ a add  i install  e edit  space on/off  d delete  s search

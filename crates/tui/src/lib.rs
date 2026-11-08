@@ -14,6 +14,7 @@ pub mod extensions_view;
 pub mod form;
 pub mod home;
 pub mod input;
+pub mod install_view;
 pub mod link;
 pub mod markdown;
 mod run;

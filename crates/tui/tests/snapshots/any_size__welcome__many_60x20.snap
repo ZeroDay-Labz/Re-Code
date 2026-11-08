@@ -21,4 +21,4 @@ expression: "screen(&draw(app, width, height))"
  │  ● model-5                               3.0 GiB  tools│
  │  ● model-6                               3.0 GiB  tools│
  ╰────────────────────────────────────────────────────────╯
-  enter start  ↑↓ choose  type to filter  ^F free ○  k key
+ enter start  ↑↓ choose  ^F free ○  ^T tools ○  ^V vision ○

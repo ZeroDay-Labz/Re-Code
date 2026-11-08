@@ -7,7 +7,7 @@ expression: "screen(&draw(app, width, height))"
                                   █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
                                  a coding agent for your own machine
 
-  Home │ Models 2 │ Runtimes │ Providers │ MCP │ Skills │ Tools │ Settings │
+  Home │ Models 2 │ Runtimes │ Providers │ MCP │ Skills │ Plugins │ Tools │ Settings │
  ╭ Cloud · 2 of 2 models ─────────────────────────────────────────────────────────────────────────╮
  │Ollama is installed but stopped                                                                 │
  │To start it: systemctl --user start ollama.service                                              │
@@ -15,20 +15,20 @@ expression: "screen(&draw(app, width, height))"
  │                                                                                                │
  │/ type to filter                                        │ openrouter/free-coder                 │
  │                                                        │ qwen · 20B · Q4_K_M                   │
- │─ Free · 1 ───────────────────────────────────────────  │                                       │
- │❯ ★ openrouter/free-coder             openrouter  tools │  free                                 │
- │─ Paid · 1 ───────────────────────────────────────────  │  tools   thinking                     │
- │  ☁ gpt-5-mini                            openai  tools │ As the provider reports them; not     │
+ │─ Free · 1 ───────────────────────────────────────────  │ Free Coder                            │
+ │❯ ★ openrouter/free-coder             openrouter  tools │                                       │
+ │─ Paid · 1 ───────────────────────────────────────────  │ A compact model for agents and tool   │
+ │  ☁ gpt-5-mini                            openai  tools │ calling, with a long context and      │
+ │                                                        │ structured output. It reasons before  │
+ │                                                        │ it answers. Prompts may be retained   │
+ │                                                        │ by the provider.                      │
+ │                                                        │                                       │
+ │                                                        │  free                                 │
+ │                                                        │  tools   thinking                     │
+ │                                                        │ As the provider reports them; not     │
  │                                                        │ tested here.                          │
  │                                                        │                                       │
  │                                                        │ Runs on the provider's servers, so it │
- │                                                        │ doesn't use your GPU.                 │
- │                                                        │                                       │
- │                                                        │ Context limit: 131072 tokens          │
- │                                                        │                                       │
- │                                                        │                                       │
- │                                                        │                                       │
- │                                                        │                                       │
  ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
  GPU       None found
-enter start  ↑↓ choose  type to filter  ^F free ○  ^T tools ○  ^V vision ○  k key  tab next  ^C quit
+ enter start  ↑↓ choose  ^F free ○  ^T tools ○  ^V vision ○  ^P provider ○  k key  tab next  ^C quit

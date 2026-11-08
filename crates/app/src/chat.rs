@@ -12,7 +12,7 @@ use crate::session::{self, Recorder, SavedConversation};
 use futures_util::StreamExt;
 use recode_core::context::{ContextWindow, WindowSetting};
 use recode_core::extensions::{CustomTool, Skill};
-use recode_core::extensions::{ExtensionCommand, ExtensionsSnapshot, McpProbe};
+use recode_core::extensions::{ExtensionCommand, ExtensionsSnapshot, InstallOutcome, McpProbe, PluginOutcome};
 use recode_core::extensions::{McpServer, ProviderProbe};
 use recode_core::ids::{ApprovalId, TurnId};
 use recode_core::message::{ImageData, Message};
@@ -22,7 +22,10 @@ use recode_core::providers::{CloudProvider, ProviderKind};
 use recode_core::usage::ComponentKind;
 use recode_core::usage::TokenCount;
 use recode_extensions::catalog::Catalog;
+use recode_extensions::fetch::{Bases, Fetcher};
 use recode_extensions::hub::McpHub;
+use recode_extensions::plugins::PluginHub;
+use recode_extensions::skillhub::Hub;
 use recode_extensions::{Extensions, Locations};
 use recode_providers::anthropic::AnthropicProvider;
 use recode_providers::ollama::{OllamaOptions, OllamaProvider};
@@ -78,10 +81,11 @@ pub fn spawn(
     resume: bool,
     allowed: Vec<std::path::PathBuf>,
     max_steps: Option<usize>,
+    memory_off: bool,
 ) -> Link {
     let (events, event_receiver) = mpsc::unbounded_channel();
     let (commands, command_receiver) = mpsc::unbounded_channel();
-    tokio::spawn(drive(paths, url, num_ctx, resume, allowed, max_steps, events, command_receiver));
+    tokio::spawn(drive(paths, url, num_ctx, resume, allowed, max_steps, memory_off, events, command_receiver));
     Link { events: event_receiver, commands }
 }
 
@@ -93,7 +97,9 @@ fn locations(paths: &Paths) -> Locations {
         project_skills: std::env::current_dir().ok().map(|dir| dir.join(".re-code/skills")),
         claude_config: home.as_ref().map(|home| home.join(".claude.json")),
         project: std::env::current_dir().ok(),
-        claude_skills: home.map(|home| home.join(".claude/skills")),
+        claude_skills: home.as_ref().map(|home| home.join(".claude/skills")),
+        claude_plugins: home.map(|home| home.join(".claude/plugins")),
+        plugins_dir: paths.data_dir.join("plugins"),
     }
 }
 
@@ -296,8 +302,21 @@ impl Manager {
             | ExtensionCommand::TestProvider(_)
             | ExtensionCommand::ImportClaudeMcp
             | ExtensionCommand::AddMcpFromLink { .. }
-            | ExtensionCommand::AddSkillFromLink(_) => {
-                unreachable!("provider and import commands are handled in the driver")
+            | ExtensionCommand::StageSkill(_)
+            | ExtensionCommand::CommitInstall { .. }
+            | ExtensionCommand::DiscardInstall(_)
+            | ExtensionCommand::UpdateSkill(_)
+            | ExtensionCommand::SearchSkills(_)
+            | ExtensionCommand::StagePlugin(_)
+            | ExtensionCommand::CommitPlugin { .. }
+            | ExtensionCommand::SetPluginEnabled(..)
+            | ExtensionCommand::DeletePlugin(_)
+            | ExtensionCommand::UpdatePlugin(_)
+            | ExtensionCommand::AddMarketplace(_)
+            | ExtensionCommand::RemoveMarketplace(_)
+            | ExtensionCommand::BrowseMarketplace(_)
+            | ExtensionCommand::SearchPlugins(_) => {
+                unreachable!("provider, import and install commands are handled in the driver")
             }
         }
     }
@@ -580,13 +599,18 @@ async fn scan(
                         continue;
                     }
                     // What the provider says comes first; the models.dev catalog fills in the rest.
-                    let facts = model.facts.clone().merge(catalog.facts(&model.name));
+                    // Only the provider's own listing says what it charges: the catalog is matched by name.
+                    let facts = model
+                        .facts
+                        .clone()
+                        .merge(catalog.facts(&model.name).map(recode_core::model_facts::ModelFacts::without_pricing));
                     routes.insert(model.name.clone(), Route::Cloud { provider: provider.clone(), key: key.clone() });
+                    let parameters = recode_core::model_facts::ModelFacts::parameters_from_name(&model.name);
                     info.models.push(WelcomeModel {
                         name: model.name,
                         size_gib: None,
                         family: Some(provider.kind.label().to_owned()),
-                        parameters: None,
+                        parameters,
                         quantization: None,
                         context_limit: facts.context,
                         // Unknown defaults to tool-capable for frontier kinds, where it's the norm.
@@ -600,6 +624,7 @@ async fn scan(
                         needs_key: key.is_none(),
                         price: facts.price,
                         kv_bytes_per_token: None,
+                        details: facts.clone(),
                     });
                 }
             }
@@ -643,64 +668,11 @@ fn read_image_file(path: &std::path::Path) -> Option<ImageData> {
     })
 }
 
-/// Adds a skill from a Git URL (cloned) or a local directory (copied) into the user skills directory.
-fn import_skill(paths: &Paths, source: &str) -> Result<String, String> {
-    use std::process::Command;
-    let source = source.trim();
-    let name = source
-        .trim_end_matches('/')
-        .trim_end_matches(".git")
-        .rsplit(['/', '\\'])
-        .next()
-        .filter(|segment| !segment.is_empty())
-        .ok_or("Couldn't work out a name from that link.")?
-        .to_owned();
-    recode_core::extensions::validate_name("skill", &name)?;
-    let destination = paths.skills_dir.join(&name);
-    if destination.exists() {
-        return Err(format!("A skill called {name} already exists."));
-    }
-    std::fs::create_dir_all(&paths.skills_dir).map_err(|error| error.to_string())?;
-    if source.starts_with("http://") || source.starts_with("https://") || source.ends_with(".git") {
-        let status = Command::new("git")
-            .args(["clone", "--depth", "1", source])
-            .arg(&destination)
-            .status()
-            .map_err(|error| format!("couldn't run git: {error}"))?;
-        if !status.success() {
-            return Err("git clone failed. Check the URL.".to_owned());
-        }
-        let _ = std::fs::remove_dir_all(destination.join(".git"));
-    } else {
-        let src = std::path::Path::new(source);
-        if !src.join("SKILL.md").is_file() {
-            return Err("That folder has no SKILL.md.".to_owned());
-        }
-        copy_dir(src, &destination).map_err(|error| error.to_string())?;
-    }
-    if !destination.join("SKILL.md").is_file() {
-        let _ = std::fs::remove_dir_all(&destination);
-        return Err("The imported skill has no SKILL.md at its root.".to_owned());
-    }
-    Ok(name)
-}
-
-fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(to)?;
-    for entry in std::fs::read_dir(from)? {
-        let entry = entry?;
-        let target = to.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            copy_dir(&entry.path(), &target)?;
-        } else {
-            std::fs::copy(entry.path(), target)?;
-        }
-    }
-    Ok(())
-}
-
 /// Builds the agent configuration for a turn: built-in + custom tool schemas, the custom tools
 /// themselves, and any skill instructions whose triggers match the request.
+/// Shown when the install client couldn't be built (TLS setup failed), which has never been seen.
+const HUB_UNAVAILABLE: &str = "Skill installs aren't available: the HTTP client couldn't be set up. The log says why.";
+
 /// The two meta-tools that let the model discover and use MCP tools without their schemas filling
 /// the context. Added only when at least one MCP server is enabled.
 pub(crate) const LIST_MCP_TOOLS: &str = "list_mcp_tools";
@@ -825,6 +797,7 @@ fn build_agent_config(
         hooks,
         spawn_provider: None,
         depth: 0,
+        memory: None,
     }
 }
 
@@ -857,6 +830,7 @@ async fn drive(
     resume: bool,
     allowed: Vec<std::path::PathBuf>,
     max_steps: Option<usize>,
+    memory_off: bool,
     events: UnboundedSender<UiEvent>,
     mut commands: UnboundedReceiver<UiCommand>,
 ) {
@@ -872,6 +846,7 @@ async fn drive(
     let mut allowed_folders = resolve_folders(&allowed, &events);
     let project_key = workspace.as_ref().map(|ws| crate::trust::canonical_key(ws.root())).unwrap_or_default();
     let plan_path = paths.data_dir.join("plans").join(format!("{}.md", crate::trust::short_hash(&project_key)));
+    let memory_places = crate::memory::Places::new(&paths.data_dir, &project_key);
     let mut permissions = Permissions::with_folders(&allowed_folders);
     permissions.load_project(project_grants(store.as_ref().ok(), &project_key));
     // A context size chosen on the Settings tab wins over the configured default.
@@ -886,6 +861,22 @@ async fn drive(
     let recorder = Recorder::start(paths.database.clone(), project.clone(), events.clone());
     let last_model = store.as_ref().ok().and_then(|store| store.setting(LAST_MODEL_KEY).ok().flatten());
     let mut manager = Manager::load(locations(&paths), store.ok());
+    // Skill installs: fetched into the cache, scanned, shown, then moved into the skills folder.
+    let (skill_hub, plugin_hub): (Option<std::sync::Arc<Hub>>, Option<std::sync::Arc<PluginHub>>) =
+        match Fetcher::new(Bases::from_env()) {
+            Ok(fetcher) => (
+                Some(std::sync::Arc::new(Hub::new(fetcher.clone(), paths.cache_dir.clone(), paths.skills_dir.clone()))),
+                Some(std::sync::Arc::new(PluginHub::new(
+                    fetcher,
+                    paths.cache_dir.clone(),
+                    paths.data_dir.join("plugins"),
+                ))),
+            ),
+            Err(error) => {
+                tracing::warn!(%error, "skill and plugin installs unavailable");
+                (None, None)
+            }
+        };
 
     let (mut info, mut routes, mut runtimes) =
         scan(&paths, &url, last_model.clone(), &mut manager, secrets.as_ref(), &catalog, num_ctx).await;
@@ -1336,13 +1327,249 @@ async fn drive(
                     let _ = sink.send(UiEvent::McpSearch { query, hits, error });
                 });
             }
-            UiCommand::Extension(ExtensionCommand::AddSkillFromLink(source)) => {
-                let outcome = match import_skill(&paths, &source) {
-                    Ok(name) => (format!("Added skill {name}. Press e to edit it."), false),
-                    Err(error) => (error, true),
+            UiCommand::Extension(ExtensionCommand::StageSkill(tap)) => {
+                let sink = events.clone();
+                match skill_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let _ = sink.send(UiEvent::Install(hub.stage(&tap).await));
+                        });
+                    }
+                    None => {
+                        let _ = sink
+                            .send(UiEvent::Install(InstallOutcome::Failed { tap, error: HUB_UNAVAILABLE.to_owned() }));
+                    }
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::UpdateSkill(name)) => {
+                let sink = events.clone();
+                match skill_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let _ = sink.send(UiEvent::Install(hub.update(&name).await));
+                        });
+                    }
+                    None => {
+                        let _ = sink.send(UiEvent::Install(InstallOutcome::Failed {
+                            tap: format!("update {name}"),
+                            error: HUB_UNAVAILABLE.to_owned(),
+                        }));
+                    }
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::CommitInstall { staging, enable }) => {
+                let outcome = match skill_hub.as_deref().map(|hub| hub.commit(&staging, enable)) {
+                    Some(Ok(committed)) => {
+                        let mut text = if committed.enabled {
+                            format!("Installed {} and switched it on.", committed.name)
+                        } else {
+                            format!("Installed {}, off. Space switches it on.", committed.name)
+                        };
+                        if let Some(note) = &committed.note {
+                            text.push(' ');
+                            text.push_str(note);
+                        }
+                        if let Err(error) = manager.extensions.set_skill_enabled(&committed.name, committed.enabled) {
+                            text.push_str(&format!(" (Its on/off choice couldn't be saved: {error})"));
+                        }
+                        (text, false)
+                    }
+                    Some(Err(error)) => (error, true),
+                    None => (HUB_UNAVAILABLE.to_owned(), true),
                 };
                 let _ = events.send(UiEvent::Extensions(manager.snapshot()));
                 let _ = events.send(UiEvent::HomeMessage { text: outcome.0, is_error: outcome.1 });
+            }
+            UiCommand::Extension(ExtensionCommand::DiscardInstall(staging)) => {
+                // Skills and plugins share the staging area; whichever recognises the folder removes it.
+                let skill = skill_hub.as_deref().map(|hub| hub.discard(&staging));
+                if !matches!(skill, Some(Ok(())))
+                    && let Some(Err(error)) = plugin_hub.as_deref().map(|hub| hub.discard(&staging))
+                {
+                    tracing::warn!(%error, "couldn't discard a staged install");
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::StagePlugin(tap)) => {
+                let sink = events.clone();
+                let markets = manager.extensions.marketplaces().to_vec();
+                match plugin_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let _ = sink.send(UiEvent::PluginInstall(hub.stage(&tap, &markets).await));
+                        });
+                    }
+                    None => {
+                        let _ = sink.send(UiEvent::PluginInstall(PluginOutcome::Failed {
+                            tap,
+                            error: HUB_UNAVAILABLE.to_owned(),
+                        }));
+                    }
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::UpdatePlugin(name)) => {
+                let sink = events.clone();
+                let markets = manager.extensions.marketplaces().to_vec();
+                match plugin_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let _ = sink.send(UiEvent::PluginInstall(hub.update(&name, &markets).await));
+                        });
+                    }
+                    None => {
+                        let _ = sink.send(UiEvent::PluginInstall(PluginOutcome::Failed {
+                            tap: format!("update {name}"),
+                            error: HUB_UNAVAILABLE.to_owned(),
+                        }));
+                    }
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::CommitPlugin { staging, enable }) => {
+                let outcome = match plugin_hub.as_deref().map(|hub| hub.commit(&staging, enable)) {
+                    Some(Ok(committed)) => {
+                        let mut text = if committed.enabled {
+                            format!("Installed plugin {}: its skills and MCP servers are on.", committed.name)
+                        } else {
+                            format!("Installed plugin {}, off. Space switches it on.", committed.name)
+                        };
+                        if let Some(note) = &committed.note {
+                            text.push(' ');
+                            text.push_str(note);
+                        }
+                        if let Err(error) = manager.extensions.set_plugin_enabled(&committed.name, committed.enabled) {
+                            text.push_str(&format!(" (Its on/off choice couldn't be saved: {error})"));
+                        }
+                        (text, false)
+                    }
+                    Some(Err(error)) => (error, true),
+                    None => (HUB_UNAVAILABLE.to_owned(), true),
+                };
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text: outcome.0, is_error: outcome.1 });
+            }
+            UiCommand::Extension(ExtensionCommand::SetPluginEnabled(name, enabled)) => {
+                let outcome = match manager.extensions.set_plugin_enabled(&name, enabled) {
+                    Ok(()) => (format!("{name} is {}.", if enabled { "on" } else { "off" }), false),
+                    Err(error) => (error.to_string(), true),
+                };
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text: outcome.0, is_error: outcome.1 });
+            }
+            UiCommand::Extension(ExtensionCommand::DeletePlugin(name)) => {
+                let outcome = match plugin_hub.as_deref().map(|hub| hub.remove(&name)) {
+                    Some(Ok(())) => {
+                        let _ = manager.extensions.forget_plugin(&name);
+                        (format!("Removed plugin {name} and everything it brought."), false)
+                    }
+                    Some(Err(error)) => (error, true),
+                    None => (HUB_UNAVAILABLE.to_owned(), true),
+                };
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text: outcome.0, is_error: outcome.1 });
+            }
+            UiCommand::Extension(ExtensionCommand::AddMarketplace(text)) => {
+                let outcome = match plugin_hub.as_deref() {
+                    Some(hub) => match hub.add_marketplace(&text).await {
+                        Ok(market) => {
+                            let summary = format!(
+                                "Following {} ({} plugins{}). Press b to browse it.",
+                                market.name,
+                                market.plugin_count,
+                                if market.sha.is_empty() { String::new() } else { format!(" at {}", &market.sha[..8]) }
+                            );
+                            match manager.extensions.add_marketplace(market) {
+                                Ok(()) => (summary, false),
+                                Err(error) => (error.to_string(), true),
+                            }
+                        }
+                        Err(error) => (error, true),
+                    },
+                    None => (HUB_UNAVAILABLE.to_owned(), true),
+                };
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text: outcome.0, is_error: outcome.1 });
+            }
+            UiCommand::Extension(ExtensionCommand::RemoveMarketplace(name)) => {
+                let outcome = match manager.extensions.remove_marketplace(&name) {
+                    Ok(()) => {
+                        if let Some(hub) = plugin_hub.as_deref() {
+                            hub.forget_marketplace(&name);
+                        }
+                        (format!("No longer following {name}. Plugins installed from it stay."), false)
+                    }
+                    Err(error) => (error.to_string(), true),
+                };
+                let _ = events.send(UiEvent::Extensions(manager.snapshot()));
+                let _ = events.send(UiEvent::HomeMessage { text: outcome.0, is_error: outcome.1 });
+            }
+            UiCommand::Extension(ExtensionCommand::BrowseMarketplace(name)) => {
+                let sink = events.clone();
+                let markets = manager.extensions.marketplaces().to_vec();
+                match plugin_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let (listings, error) = match hub.browse(&name, &markets).await {
+                                Ok(listings) => (listings, None),
+                                Err(error) => (Vec::new(), Some(error)),
+                            };
+                            let _ = sink.send(UiEvent::PluginListings { title: name, listings, error });
+                        });
+                    }
+                    None => {
+                        let _ = sink.send(UiEvent::PluginListings {
+                            title: name,
+                            listings: Vec::new(),
+                            error: Some(HUB_UNAVAILABLE.to_owned()),
+                        });
+                    }
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::SearchPlugins(query)) => {
+                let sink = events.clone();
+                let markets = manager.extensions.marketplaces().to_vec();
+                match plugin_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let (listings, error) = match hub.search(&query, &markets, 40).await {
+                                Ok(listings) => (listings, None),
+                                Err(error) => (Vec::new(), Some(error)),
+                            };
+                            let _ = sink.send(UiEvent::PluginListings {
+                                title: format!("search: {query}"),
+                                listings,
+                                error,
+                            });
+                        });
+                    }
+                    None => {
+                        let _ = sink.send(UiEvent::PluginListings {
+                            title: format!("search: {query}"),
+                            listings: Vec::new(),
+                            error: Some(HUB_UNAVAILABLE.to_owned()),
+                        });
+                    }
+                }
+            }
+            UiCommand::Extension(ExtensionCommand::SearchSkills(query)) => {
+                let sink = events.clone();
+                match skill_hub.clone() {
+                    Some(hub) => {
+                        tokio::spawn(async move {
+                            let (hits, note, error) = match hub.search(&query, 25).await {
+                                Ok(search) => (search.hits, search.note, None),
+                                Err(error) => (Vec::new(), None, Some(error)),
+                            };
+                            let _ = sink.send(UiEvent::SkillSearch { query, hits, note, error });
+                        });
+                    }
+                    None => {
+                        let _ = sink.send(UiEvent::SkillSearch {
+                            query,
+                            hits: Vec::new(),
+                            note: None,
+                            error: Some(HUB_UNAVAILABLE.to_owned()),
+                        });
+                    }
+                }
             }
             UiCommand::Extension(ExtensionCommand::ImportClaudeMcp) => {
                 // Copies Claude Code's servers into re-code's own file, so they stay even if Claude Code changes.
@@ -1465,6 +1692,24 @@ async fn drive(
                         }
                         let hooks = std::sync::Arc::new(load_hooks(&manager, &paths));
                         let mut config = build_agent_config(&manager, &clean, plan_path.clone(), max_steps, hooks);
+                        let mode = if memory_off {
+                            crate::memory::Mode::Off
+                        } else {
+                            crate::memory::Mode::parse(
+                                manager.store.as_ref().and_then(|s| s.setting("ui:memory").ok().flatten()).as_deref(),
+                            )
+                        };
+                        if mode != crate::memory::Mode::Off {
+                            let memories = crate::memory::list(&memory_places);
+                            if let Some(part) = crate::memory::system_part(&memories, mode) {
+                                config.extra_system.insert(0, (ComponentKind::Memory, part));
+                            }
+                            config.tools.push(crate::memory::tool_definition(mode));
+                            config.memory = Some(MemoryConfig {
+                                places: memory_places.clone(),
+                                read_only: mode == crate::memory::Mode::ReadOnly,
+                            });
+                        }
                         // Tasks need their own connection to the same model, and room to be worth it.
                         config.spawn_provider = routes.get(&chat.model).cloned().map(|route| {
                             let url = url.clone();
@@ -1649,7 +1894,22 @@ async fn drive(
                         tokens: file.tokens,
                         trusted: file.trusted,
                         problem: file.problem.clone(),
+                        memory: None,
                     })
+                    .chain(crate::memory::list(&memory_places).into_iter().map(|memory| {
+                        let kind = if memory.kind.is_empty() { String::new() } else { format!(" · {}", memory.kind) };
+                        recode_tui::link::InstructionFileInfo {
+                            scope: format!("remembered · {}{kind}: {}", memory.scope.label(), memory.description),
+                            path: memory.path.display().to_string(),
+                            tokens: memory.tokens(),
+                            trusted: true,
+                            problem: None,
+                            memory: Some((
+                                if memory.scope == crate::memory::Scope::User { "user" } else { "project" }.to_owned(),
+                                memory.name.clone(),
+                            )),
+                        }
+                    }))
                     .collect();
                 let _ = events.send(UiEvent::InstructionFiles {
                     files,
@@ -1660,6 +1920,14 @@ async fn drive(
                         .as_ref()
                         .map(|project| project.join(crate::init::FILE_NAME).display().to_string()),
                 });
+            }
+            UiCommand::ForgetMemory { scope, name } => {
+                let scope = if scope == "user" { crate::memory::Scope::User } else { crate::memory::Scope::Project };
+                let text = match crate::memory::forget(&memory_places, scope, &name) {
+                    Ok(()) => format!("Forgot \"{name}\"; re-code won't bring it up again."),
+                    Err(reason) => format!("Couldn't forget \"{name}\": {reason}."),
+                };
+                let _ = events.send(UiEvent::Notice(text));
             }
             UiCommand::WriteNote { scope, text } => {
                 use recode_tui::link::NoteScope;
@@ -1961,6 +2229,18 @@ async fn drive(
             UiCommand::ListSessions => {
                 let _ = events.send(UiEvent::Sessions(session_summaries(manager.store.as_ref(), &project)));
             }
+            UiCommand::DeleteSession(id) => match recode_core::ids::SessionId::parse(&id) {
+                Ok(session) => {
+                    // Deleting the open conversation means starting afresh; the writer forgets the id too.
+                    if recorder.current() == Some(session) {
+                        pending.push_front(UiCommand::NewConversation);
+                    }
+                    recorder.delete(session);
+                }
+                Err(_) => {
+                    let _ = events.send(UiEvent::Notice(format!("{id} isn't a session id.")));
+                }
+            },
             UiCommand::ContinueSession(id) => {
                 // Whatever is open now is already saved, so it can be set aside.
                 if !chat.is_empty() {
@@ -2253,7 +2533,7 @@ fn probe_http_servers(
 }
 
 /// This folder's saved sessions, most recent first, as the interface lists them.
-fn session_summaries(store: Option<&Store>, project: &str) -> Vec<recode_tui::link::SessionSummary> {
+pub(crate) fn session_summaries(store: Option<&Store>, project: &str) -> Vec<recode_tui::link::SessionSummary> {
     store
         .and_then(|store| store.snapshots_for_project(project).ok())
         .unwrap_or_default()
@@ -2475,6 +2755,7 @@ fn welcome_info(report: &Report, last_model: Option<String>, num_ctx: u32) -> We
                         needs_key: false,
                         price: None,
                         kv_bytes_per_token,
+                        details: recode_core::model_facts::ModelFacts::default(),
                     }
                 })
                 .collect();
@@ -2721,14 +3002,45 @@ impl Chat {
     }
 
     fn read_result(&self, call: &ToolCall) -> String {
-        let handle = call.arguments.get("handle").and_then(|v| v.as_str()).unwrap_or_default();
+        let handle = call.arguments.get("handle").and_then(|v| v.as_str()).unwrap_or_default().trim();
+        let offset = call
+            .arguments
+            .get("offset")
+            .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.trim().parse().ok())))
+            .and_then(|n| usize::try_from(n).ok())
+            .unwrap_or(1)
+            .max(1);
         match self.elided.get(handle) {
-            Some(original) => original.clone(),
+            Some(original) => {
+                let (text, total, next) = compact::page(original, offset, self.result_cap_chars().saturating_sub(300));
+                if text.is_empty() {
+                    return format!("Error: result {handle} has {total} lines; offset {offset} is past the end.");
+                }
+                match next {
+                    Some(next) => format!(
+                        "{text}[result {handle}: lines {offset}–{} of {total}; call read_result with \"{handle}\" and offset \
+                         {next} for more]",
+                        next - 1
+                    ),
+                    None => text,
+                }
+            }
             None => {
                 let known: Vec<&str> = self.elided.keys().map(String::as_str).collect();
                 format!("Error: there's no shortened result called '{handle}'. Known handles: {}.", known.join(", "))
             }
         }
+    }
+
+    /// The most one tool result may hold in the conversation: a quarter of the request budget, so a
+    /// few results and the rest of the conversation still fit. Without a window, the read tool's own cap.
+    fn result_cap_chars(&self) -> usize {
+        match compact::Limits::for_window(&self.window) {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+            Some(limits) => ((limits.budget / 4) as f64 * self.calibration.ratio()) as usize,
+            None => 64 * 1024,
+        }
+        .max(2_000)
     }
 
     /// Makes sure the next request fits the model's context window (`docs/CONTEXT_ENGINE.md`). From the
@@ -2746,6 +3058,9 @@ impl Chat {
     ) -> Result<(), String> {
         let force = force || std::mem::take(&mut self.force_compact_next);
         let ratio = self.calibration.ratio();
+        // Before anything else, on every request: no single result may take more than its share.
+        let cap = self.result_cap_chars();
+        compact::clip(&mut self.messages, &mut self.elided, cap);
         // Measured against the tools the request would carry, so before and after compare like with like.
         let before = compact::estimate_with(&self.messages, &self.offered_tools(tools), ratio);
         let limits = match compact::Limits::for_window(&self.window) {
@@ -2757,7 +3072,7 @@ impl Chat {
             return Ok(());
         }
         emit(EventKind::StateChanged { state: AgentState::Compacting });
-        let elided = compact::elide(&mut self.messages, &mut self.elided);
+        let mut elided = compact::elide(&mut self.messages, &mut self.elided);
         let tools = self.offered_tools(tools);
         let (mut summarised, mut problem) = (0, None);
         let mut originals: Vec<Message> = Vec::new();
@@ -2776,6 +3091,11 @@ impl Chat {
                     problem = Some(format!("Summarising didn't work ({error}), so only the shortening was kept."));
                 }
             }
+        }
+        // Still too big: the newest results go behind handles too. They stay a read_result away, and a
+        // conversation that can't be sent at all helps nobody.
+        if compact::estimate_with(&self.messages, &tools, ratio) > limits.budget {
+            elided += compact::elide_keeping(&mut self.messages, &mut self.elided, 0);
         }
         let after = compact::estimate_with(&self.messages, &tools, ratio);
         emit(EventKind::Compacted {
@@ -2970,6 +3290,7 @@ impl Chat {
                 hooks: config.hooks.clone(),
                 spawn_provider: None,
                 depth: config.depth + 1,
+                memory: config.memory.clone().map(|memory| MemoryConfig { read_only: true, ..memory }),
             };
             let mut steps: Vec<String> = vec![format!("Task: {description}")];
             let mut answer = String::new();
@@ -2994,7 +3315,6 @@ impl Chat {
                     | EventKind::ApprovalResolved { .. }
                     | EventKind::StateChanged { .. }
                     | EventKind::UsageReported { .. }
-                    | EventKind::Compacted { .. }
                     | EventKind::HookRan { .. } => emit(kind),
                     _ => {}
                 };
@@ -3464,7 +3784,9 @@ impl Chat {
                             &mut emit,
                         )
                         .await;
-                    emit(EventKind::ToolOutput { call_id: call.id.clone(), text: text.clone() });
+                    // The helper's steps already showed as rows of their own; its row shows the outcome.
+                    let shown = text.split_once("\n\n").map_or(text.as_str(), |(_, outcome)| outcome);
+                    emit(EventKind::ToolOutput { call_id: call.id.clone(), text: shown.to_owned() });
                     let summary = if success { "task done" } else { "task failed" }.to_owned();
                     emit(EventKind::ToolFinished { call_id: call.id.clone(), success, summary });
                     self.messages.push(Message::tool_result(&call, crate::subagent::cap_result(&text)));
@@ -3476,6 +3798,41 @@ impl Chat {
                     let summary = if success { "done" } else { "unknown task" }.to_owned();
                     emit(EventKind::ToolFinished { call_id: call.id.clone(), success, summary });
                     self.messages.push(Message::tool_result(&call, text));
+                    continue;
+                }
+                if call.name == crate::memory::TOOL && !crate::memory::writes(&call) {
+                    let (text, success, summary) = match &config.memory {
+                        Some(memory) => {
+                            let read_only = memory.read_only || permissions.mode == PermissionMode::Plan;
+                            let (text, success, summary, _) = crate::memory::run(&memory.places, read_only, &call);
+                            (text, success, summary)
+                        }
+                        None => ("Error: memory is off for this session.".to_owned(), false, "off".to_owned()),
+                    };
+                    emit(EventKind::ToolOutput { call_id: call.id.clone(), text: text.clone() });
+                    emit(EventKind::ToolFinished { call_id: call.id.clone(), success, summary });
+                    self.messages.push(Message::tool_result(&call, text));
+                    continue;
+                }
+                // A save or forget that can't happen is answered without asking the user.
+                if call.name == crate::memory::TOOL
+                    && let Some(reason) = match &config.memory {
+                        None => Some("Error: memory is off for this session.".to_owned()),
+                        Some(memory) if memory.read_only || permissions.mode == PermissionMode::Plan => Some(
+                            "Error: memory is read-only here (plan mode, a helper task, or the user set it so). \
+                             Nothing was saved."
+                                .to_owned(),
+                        ),
+                        Some(_) => None,
+                    }
+                {
+                    emit(EventKind::ToolOutput { call_id: call.id.clone(), text: reason.clone() });
+                    emit(EventKind::ToolFinished {
+                        call_id: call.id.clone(),
+                        success: false,
+                        summary: "refused".to_owned(),
+                    });
+                    self.messages.push(Message::tool_result(&call, reason));
                     continue;
                 }
                 if call.name == crate::plan_tool::TOOL {
@@ -3568,18 +3925,22 @@ impl Chat {
                     reason
                 } else if decision == Decision::Run {
                     let grants = permissions.sandbox_grants();
-                    run_or_background(
-                        &call,
-                        &config.custom,
-                        workspace,
-                        hub,
-                        checkpoints,
-                        &grants,
-                        &cancel,
-                        &mut emit,
-                        background,
-                    )
-                    .await
+                    if call.name == crate::memory::TOOL {
+                        run_memory(&call, config.memory.as_ref(), &mut emit)
+                    } else {
+                        run_or_background(
+                            &call,
+                            &config.custom,
+                            workspace,
+                            hub,
+                            checkpoints,
+                            &grants,
+                            &cancel,
+                            &mut emit,
+                            background,
+                        )
+                        .await
+                    }
                 } else {
                     let approval = ApprovalId::new();
                     let (description, diff) = if let Some(tool) = config.custom.get(&call.name) {
@@ -3593,6 +3954,8 @@ impl Chat {
                         )
                     } else if is_mcp_call(&call.name) {
                         (describe_mcp_call(&call), None)
+                    } else if call.name == crate::memory::TOOL {
+                        (crate::memory::describe(&call), None)
                     } else {
                         describe_tool(&call, workspace, &reach)
                     };
@@ -3626,18 +3989,22 @@ impl Chat {
                                 }
                             }
                             let grants = permissions.sandbox_grants();
-                            run_or_background(
-                                &call,
-                                &config.custom,
-                                workspace,
-                                hub,
-                                checkpoints,
-                                &grants,
-                                &cancel,
-                                &mut emit,
-                                background,
-                            )
-                            .await
+                            if call.name == crate::memory::TOOL {
+                                run_memory(&call, config.memory.as_ref(), &mut emit)
+                            } else {
+                                run_or_background(
+                                    &call,
+                                    &config.custom,
+                                    workspace,
+                                    hub,
+                                    checkpoints,
+                                    &grants,
+                                    &cancel,
+                                    &mut emit,
+                                    background,
+                                )
+                                .await
+                            }
                         }
                     }
                 };
@@ -3711,6 +4078,20 @@ impl Chat {
         }
         emit(EventKind::TurnFinished { turn, outcome });
     }
+}
+
+/// Runs an approved `memory` save or forget, and shows it as the tool's row.
+fn run_memory(call: &ToolCall, memory: Option<&MemoryConfig>, emit: &mut impl FnMut(EventKind)) -> String {
+    let (text, success, summary) = match memory {
+        Some(memory) => {
+            let (text, success, summary, _) = crate::memory::run(&memory.places, memory.read_only, call);
+            (text, success, summary)
+        }
+        None => ("Error: memory is off for this session.".to_owned(), false, "off".to_owned()),
+    };
+    emit(EventKind::ToolOutput { call_id: call.id.clone(), text: text.clone() });
+    emit(EventKind::ToolFinished { call_id: call.id.clone(), success, summary });
+    text
 }
 
 /// A shell call with `background: true` starts a task instead of running to completion; everything
@@ -3812,6 +4193,15 @@ struct AgentConfig {
     spawn_provider: Option<ProviderFactory>,
     /// 0 for the user's conversation, 1 inside a task (tasks don't nest).
     depth: u8,
+    /// Where memories live and whether this turn may change them; `None` when memory is off.
+    memory: Option<MemoryConfig>,
+}
+
+/// The `memory` tool's reach for one turn.
+#[derive(Clone)]
+struct MemoryConfig {
+    places: crate::memory::Places,
+    read_only: bool,
 }
 
 /// Resolves a custom tool's command into an argv, substituting `{param}` with the given arguments.
@@ -4652,6 +5042,7 @@ mod tests {
             hooks: std::sync::Arc::default(),
             spawn_provider: None,
             depth: 0,
+            memory: None,
             skills: Vec::new(),
             invoked_text: None,
         };
@@ -4709,6 +5100,50 @@ mod tests {
             chat.messages.push(Message::assistant("", vec![call.clone()]));
             chat.messages.push(Message::tool_result(&call, format!("content of file {step}\n{}", "x".repeat(size))));
         }
+    }
+
+    /// The failure a user hit on a 32k window: a few whole-file reads in the latest steps were bigger
+    /// than the window, compaction kept them whole, and from then on every message was refused.
+    #[tokio::test]
+    async fn huge_recent_results_are_cut_to_fit_and_the_conversation_carries_on() {
+        let server = MockServer::start().await;
+        Mock::given(path("/api/chat"))
+            .respond_with(ResponseTemplate::new(200).set_body_string(RECORDED_TEXT))
+            .mount(&server)
+            .await;
+        let mut chat = Chat::new(OllamaProvider::new(&server.uri()).unwrap(), 8192);
+        chat.model = "m".to_owned();
+        let file: String = (1..=3000).map(|n| format!("fn line_{n}() {{}}\n")).collect();
+        chat.messages.push(Message::user("review my code"));
+        for step in 0..4 {
+            let call =
+                ToolCall { id: format!("c{step}"), name: "read".into(), arguments: json!({"path": "src/app.rs"}) };
+            chat.messages.push(Message::assistant("", vec![call.clone()]));
+            chat.messages.push(Message::tool_result(&call, file.clone()));
+        }
+        chat.messages.push(Message::user("ok so what do you think?"));
+        let mut events = Vec::new();
+        let fitted =
+            chat.fit(&tool_definitions(), None, false, &CancellationToken::new(), &mut |e| events.push(e)).await;
+        assert_eq!(fitted, Ok(()), "{events:?}");
+        let budget = chat.window.budget().unwrap();
+        let tools = chat.offered_tools(&tool_definitions());
+        assert!(compact::estimate_with(&chat.messages, &tools, chat.calibration.ratio()) <= budget);
+        // Every result is behind a handle now, and the whole text pages back in parts that fit.
+        let cap = chat.result_cap_chars();
+        let handle = chat.elided.iter().find(|(_, text)| text.len() == file.len()).map(|(h, _)| h.clone()).unwrap();
+        let call = |offset: usize| ToolCall {
+            id: "x".into(),
+            name: compact::READ_RESULT.into(),
+            arguments: json!({"handle": handle, "offset": offset}),
+        };
+        let first = chat.read_result(&call(1));
+        assert!(first.starts_with("fn line_1() {}") && first.chars().count() <= cap, "{}", &first[..80]);
+        let next: usize = first.rsplit("offset ").next().unwrap().trim_end_matches(" for more]").parse().unwrap();
+        let second = chat.read_result(&call(next));
+        assert!(second.starts_with(&format!("fn line_{next}() {{}}")), "{}", &second[..80]);
+        let last = chat.read_result(&call(3000));
+        assert_eq!(last, "fn line_3000() {}\n");
     }
 
     #[tokio::test]
@@ -4800,6 +5235,7 @@ mod tests {
             hooks: std::sync::Arc::default(),
             spawn_provider: Some(factory),
             depth: 0,
+            memory: None,
             skills: Vec::new(),
             invoked_text: None,
         };
@@ -4826,8 +5262,7 @@ mod tests {
             _ => None,
         });
         let output = output.expect("the task reported");
-        assert!(output.starts_with("Task: survey"), "{output}");
-        assert!(output.contains("Result:\n") && output.contains("Hello there friend."), "{output}");
+        assert!(output.starts_with("Result:\n") && output.contains("Hello there friend."), "{output}");
         assert!(events.iter().any(|e| matches!(e, EventKind::ToolFinished { call_id, success: true, summary, .. } if call_id == "call_1" && summary == "task done")));
         // Only the parent's own turn appears as a turn; the task's start and finish stayed inside the tool row.
         assert_eq!(events.iter().filter(|e| matches!(e, EventKind::TurnStarted { .. })).count(), 1);
@@ -4872,6 +5307,7 @@ mod tests {
             hooks: std::sync::Arc::default(),
             spawn_provider: None,
             depth: 0,
+            memory: None,
             skills: Vec::new(),
             invoked_text: None,
         };
@@ -4899,6 +5335,95 @@ mod tests {
         assert_eq!(requested, 1, "one row per call, even when it's refused");
         assert!(events.iter().any(|e| matches!(e, EventKind::ToolFinished { call_id, success: false, summary, .. } if call_id == "call_1" && summary == "not in this mode")));
         assert!(!dir.path().join("src/new.rs").exists());
+    }
+
+    #[tokio::test]
+    async fn the_model_saves_a_memory_and_plan_mode_keeps_it_read_only() {
+        const SAVE_CALL: &str = concat!(
+            r#"{"model":"m","created_at":"2026-11-06T18:48:11Z","message":{"role":"assistant","content":"","tool_calls":[{"id":"call_1","function":{"index":0,"name":"memory","arguments":{"action":"save","name":"fedora-commands","description":"Which package manager to use","type":"feedback","body":"Always dnf, never apt."}}}]},"done":false}"#,
+            "\n",
+            r#"{"model":"m","created_at":"2026-11-06T18:48:11Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":10,"eval_count":5}"#,
+            "\n"
+        );
+        let data = tempfile::tempdir().unwrap();
+        let places = crate::memory::Places::new(data.path(), "/home/u/project");
+        for plan_mode in [false, true] {
+            let server = MockServer::start().await;
+            Mock::given(path("/api/chat"))
+                .respond_with(ResponseTemplate::new(200).set_body_string(SAVE_CALL))
+                .up_to_n_times(1)
+                .with_priority(1)
+                .mount(&server)
+                .await;
+            Mock::given(path("/api/chat"))
+                .respond_with(ResponseTemplate::new(200).set_body_string(RECORDED_TEXT))
+                .mount(&server)
+                .await;
+            let dir = tempfile::tempdir().unwrap();
+            let workspace = Workspace::new(dir.path()).unwrap();
+            let mut chat = Chat::new(OllamaProvider::new(&server.uri()).unwrap(), 4096);
+            let mut tools = tool_definitions();
+            tools.push(crate::memory::tool_definition(crate::memory::Mode::On));
+            let config = AgentConfig {
+                tools,
+                custom: HashMap::new(),
+                extra_system: Vec::new(),
+                project_trusted: true,
+                plan_path: std::env::temp_dir().join("re-code-test-plan.md"),
+                max_steps: MAX_AGENT_STEPS,
+                hooks: std::sync::Arc::default(),
+                spawn_provider: None,
+                depth: 0,
+                memory: Some(MemoryConfig { places: places.clone(), read_only: false }),
+                skills: Vec::new(),
+                invoked_text: None,
+            };
+            let mut permissions = Permissions::default();
+            if plan_mode {
+                permissions.mode = PermissionMode::Plan;
+            }
+            // A save asks first; this user said "always" earlier in the session.
+            let save = ToolCall { id: "c".into(), name: "memory".into(), arguments: json!({"action": "save"}) };
+            assert!(matches!(reach(&save, &workspace, &HashMap::new()), Reach::Ask { grant: Some(_), .. }));
+            let read = ToolCall { id: "c".into(), name: "memory".into(), arguments: json!({"action": "read"}) };
+            assert_eq!(reach(&read, &workspace, &HashMap::new()), Reach::Free);
+            permissions.allow(Grant::Exact("memory:write".into()));
+            let (_tx, mut rx) = mpsc::unbounded_channel();
+            let mut events = Vec::new();
+            chat.agent_turn(
+                "remember that I use dnf".to_owned(),
+                Vec::new(),
+                &workspace,
+                &config,
+                &mut McpHub::new(Vec::new()),
+                &mut permissions,
+                &mut Checkpoints::default(),
+                &mut rx,
+                &std::sync::Mutex::new(std::collections::VecDeque::new()),
+                &mut crate::background::BackgroundTasks::default(),
+                CancellationToken::new(),
+                |event| events.push(event),
+            )
+            .await;
+            assert_eq!(outcome(&events), TurnOutcome::Completed);
+            let finished = events.iter().find_map(|e| match e {
+                EventKind::ToolFinished { call_id, success, summary } if call_id == "call_1" => {
+                    Some((*success, summary.clone()))
+                }
+                _ => None,
+            });
+            if plan_mode {
+                assert_eq!(finished, Some((false, "refused".to_owned())));
+            } else {
+                assert_eq!(finished, Some((true, "remembered · project".to_owned())));
+                let memories = crate::memory::list(&places);
+                assert_eq!(memories.len(), 1);
+                let part = crate::memory::system_part(&memories, crate::memory::Mode::On).unwrap();
+                assert!(part.contains("- fedora-commands (feedback): Which package manager to use"), "{part}");
+                std::fs::remove_file(&memories[0].path).unwrap();
+            }
+        }
+        assert!(crate::memory::list(&places).is_empty(), "plan mode saved nothing");
     }
 
     #[test]
@@ -5165,6 +5690,7 @@ data: [DONE]\n\n";
             hooks: std::sync::Arc::default(),
             spawn_provider: None,
             depth: 0,
+            memory: None,
             skills: Vec::new(),
             invoked_text: None,
         };
@@ -5310,6 +5836,7 @@ data: [DONE]\n\n";
             hooks: std::sync::Arc::default(),
             spawn_provider: None,
             depth: 0,
+            memory: None,
             skills: Vec::new(),
             invoked_text: None,
         };
@@ -5378,6 +5905,7 @@ data: [DONE]\n\n";
             hooks: std::sync::Arc::default(),
             spawn_provider: None,
             depth: 0,
+            memory: None,
             skills: Vec::new(),
             invoked_text: None,
         };
@@ -5459,6 +5987,7 @@ data: [DONE]\n\n";
             hooks: std::sync::Arc::default(),
             spawn_provider: None,
             depth: 0,
+            memory: None,
             skills: Vec::new(),
             invoked_text: None,
         };
@@ -5579,6 +6108,7 @@ done
             hooks: std::sync::Arc::default(),
             spawn_provider: None,
             depth: 0,
+            memory: None,
             skills: Vec::new(),
             invoked_text: None,
         };

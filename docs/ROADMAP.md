@@ -116,6 +116,14 @@ two rows, and a manual compaction with nothing to shorten claimed it had compact
 after against different tool lists. Not checked live: mouse selection and middle-click paste (unit-tested;
 tmux can't drive the mouse), idle compaction, and a compaction that really summarises on this model.
 
+**Landed 2026-11-07 (memory, milestone 4 track M0):** re-code keeps memory between sessions
+(`crates/app/src/memory.rs`, `docs/CONTEXT_ENGINE.md` "Memory"). Live on gpt-oss:20b: asked to remember
+that packages come from dnf, it saved a user memory; a new session answered `sudo dnf install ripgrep`, and
+with `--no-memory` it answered `cargo install ripgrep`. In the TUI a save showed its approval card, `p`
+allowed it for the project, and a new session answered `cargo nextest run`. Also from a user's report on a
+32k window: one tool result can no longer fill the window, `read` pages with `offset`/`limit`, and a
+conversation over budget recovers instead of refusing every message ("One result never fills the window").
+
 **Landed 2026-11-07 (select anything):** a drag selects text anywhere on screen, not only in the
 conversation: the side panel, the prompt, the home tabs, overlays; it is clipped to the region it started
 in and copied from the frame as it was seen. Copies go to the clipboard and to the primary selection
@@ -307,6 +315,45 @@ Done ahead of schedule: Anthropic, OpenAI and Gemini reachable (OpenAI-compatibl
 
 - **Done early:** management screens, stored configuration, real connection testing, cached metadata, and token cost per server.
 - **Still to do:** giving these to models with lazy discovery and permissions, agent profiles, hooks, project trust, importing from other tools, and https:// servers.
+- **Landed 2026-11-08 (skill hubs, milestone 4 track X3):** `/skill install official/security/godmode`
+  (and `i` on the Skills tab) installs the way Hermes Agent does, from the Hermes index (a bare name or
+  `hermes/<identifier>`; the index is ~42 MB, fetched once a day), GitHub (`owner/repo[/folder][@ref]`, tree
+  and blob links, raw `SKILL.md` links), skills.sh links (its API needs a login, so the files come from the
+  repository it points at, and the window says so), any `SKILL.md` link, or a local folder. Nothing fetched
+  is run: files come through GitHub's tree listing and raw endpoint (no git, no tarball), into a staging
+  folder under the cache, with limits (5 MB, 400 files, 2 MB per file), links and submodules skipped and
+  reported, paths that leave the folder refused. The preview reads like Hermes' (`godmode [official] pinned
+  @ 4134cbef · declares no tools, hooks, middleware, or env vars · 7 files · ~3.4k tokens`), then the scan,
+  then `y` enable, `k` keep off, `n` discard, `r` read `SKILL.md`; a dangerous verdict can only be kept off.
+  `.re-code-source.toml` in the installed folder records tap, repository, path and commit; `u` (or
+  `/skill update <name>`) fetches the newest commit and lists the files that would change before replacing.
+  `/skill search <words>` searches the Hermes index. A repository holding several skills offers them to pick
+  from. Verified against a mock GitHub/skills.sh/Hermes (`crates/extensions/tests/skillhub.rs`) and live
+  (`skillhub_live.rs`, ignored: `official/security/godmode` pinned, 9 files, two package-installer cautions
+  in its scripts; `anthropics/skills/skills/pdf` with 8 scripts; the skills.sh link falling back to GitHub;
+  the whole `anthropics/skills` repository offering 20 skills; the 42 MB Hermes index searched in ~2 s). The
+  live run found a crash on multi-byte text in the env-var scan, fixed. Not supported yet: other git hosts
+  (X8).
+- **Landed 2026-11-08:** saved chats can be deleted from the Home list and the session picker (`d`, with a
+  confirmation; the session writer deletes and re-sends the list; deleting the open chat starts a new one).
+- **Landed 2026-11-08 (plugins, track X5):** `crates/extensions/src/plugins.rs`. The Hermes plugin catalog
+  (`plugin-catalog.json`, 1,200 entries, shape read live: `entries[{name, repo, sha, subdir?, tier,
+  maintainer, capabilities}]` plus `removed[]`, cached 6 h) and Claude Code marketplaces
+  (`.claude-plugin/marketplace.json` read at a pinned commit; sources `./path`, `url`, `git-subdir`,
+  `github` resolve to GitHub folders, `archive` is refused until zip support, `npm` and `command` are refused
+  because they run code) feed the same fetch layer as skills. A plugin folder is read part by part:
+  `skills/*/SKILL.md` and `commands/*.md` become skills (`SkillSource::Plugin`, removed with the plugin),
+  `mcp.json`/`.mcp.json` servers join the MCP list with `${CLAUDE_PLUGIN_ROOT}` resolved, `hooks/hooks.json`
+  is translated into `hooks.converted.toml` (PreToolUse/PostToolUse/Stop/SessionStart and the tool matchers
+  that map) and never loaded on its own, and Python code, `desktop/`, `agents/`, `.lsp.json`, `bin/`, output
+  styles and `settings.json` are listed as not run here. Installed plugins live under
+  `~/.local/share/re-code/plugins/<name>/` with a `.re-code-source.toml`; `extensions.toml` keeps the
+  followed `[[marketplace]]` records and `disabled_plugins`. The Plugins tab lists installed plugins,
+  followed marketplaces and what Claude Code has installed (read from `installed_plugins.json`, read-only;
+  Enter installs one from its folder). Verified against a mock GitHub and catalog
+  (`crates/extensions/tests/plugins.rs`: catalog install with Hermes' header, removed entries, marketplace
+  add/browse/install with converted hooks, a dangerous skill keeping a plugin off, a local marketplace) and
+  in the TUI tests. Live checks are listed in the CHANGELOG once run.
 
 **Demo:** add a server with many tools. Baseline context grows only by a small index, and tools still work.
 

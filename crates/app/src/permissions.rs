@@ -63,6 +63,14 @@ pub fn reach(call: &ToolCall, workspace: &Workspace, custom: &std::collections::
         outside: None,
         sensitive: false,
     };
+    if call.name == crate::memory::TOOL {
+        // Reading is free; a lasting change asks, so a hostile file can't plant one unseen.
+        return if crate::memory::writes(call) {
+            exact("memory:write".to_owned(), "always let re-code save and forget memories".to_owned())
+        } else {
+            Reach::Free
+        };
+    }
     if call.name == CALL_MCP_TOOL || call.name.starts_with(MCP_DIRECT_PREFIX) {
         let (server, tool) = if call.name == CALL_MCP_TOOL {
             let text = |key| call.arguments.get(key).and_then(|v| v.as_str()).unwrap_or_default().to_owned();
@@ -212,7 +220,8 @@ pub enum Decision {
 }
 
 /// The tools plan mode leaves available: reading and bookkeeping, plus the plan itself.
-const PLAN_TOOLS: &[&str] = &["read", "list", "grep", "git", "skill", "todo", compact::READ_RESULT, LIST_MCP_TOOLS];
+const PLAN_TOOLS: &[&str] =
+    &["read", "list", "grep", "git", "skill", "todo", "memory", compact::READ_RESULT, LIST_MCP_TOOLS];
 
 impl Permissions {
     /// Takes up the grants remembered for this project.
@@ -327,6 +336,7 @@ fn describe_key(key: &str) -> String {
         (Some("shell"), Some(_), Some(command)) => format!("run `{command}`"),
         (Some("mcp"), Some(server), Some(tool)) => format!("call {tool} on {server}"),
         (Some("custom"), Some(name), _) => format!("run the custom tool {name}"),
+        (Some("memory"), Some("write"), _) => "save and forget memories".to_owned(),
         _ => key.to_owned(),
     }
 }

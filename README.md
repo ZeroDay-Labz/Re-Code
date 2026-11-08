@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon/re-code-256.png" width="128" height="128" alt="re-code icon: a gradient diamond over a terminal prompt">
+</p>
+
 # re-code
 
 A terminal-native AI coding agent for Linux, written in Rust. It is built to work properly with
@@ -13,6 +17,33 @@ A terminal-native AI coding agent for Linux, written in Rust. It is built to wor
 > against a live cloud provider. Much of these documents still describes the plan.
 >
 > `re-code` is a working name. See decision D1 in [ARCHITECTURE](docs/ARCHITECTURE.md#decisions-needed).
+
+## Install
+
+Packages for Fedora and Debian/Ubuntu are on the [releases page](https://github.com/ZeroDay-Labz/Re-Code/releases):
+
+```sh
+sudo dnf install ./re-code-*.rpm      # Fedora
+sudo apt install ./re-code_*.deb      # Debian, Ubuntu
+```
+
+Or build from source with a current stable Rust toolchain: `cargo install --path crates/app`. `bubblewrap` is
+recommended (it sandboxes the commands the agent runs; `sudo dnf install bubblewrap`), and a running
+[Ollama](https://ollama.com) with a tool-capable model is the usual starting point. Run `re-code` in a project
+folder; `re-code doctor` explains what it found on the machine.
+
+## A look around
+
+Every screen below was captured from the real program (`scripts/screenshots/capture.sh`).
+
+| | |
+| --- | --- |
+| **Home.** Local models with real sizes, what each declares (tools, vision, thinking) and whether it fits your GPU; live GPU and memory meters. ![Home](assets/screenshots/home.png) | **Models.** The models tab lists every model your runtime serves and estimates the context memory on top of the weights. ![Models](assets/screenshots/models.png) |
+| **Approval.** Edits, writes, deletes and commands wait for you, with a live diff. `y` once, `a` for the session, `p` for the project. ![Approval](assets/screenshots/approval.png) | **A turn.** Tool calls as rows, reasoning folded away, and a footer with provider-reported tokens, not estimates. ![Conversation](assets/screenshots/conversation.png) |
+| **Runtimes.** Ollama, llama.cpp, vLLM and LM Studio found through podman, docker, systemd and the processes that are actually answering. ![Runtimes](assets/screenshots/runtimes.png) | **MCP.** Your servers, plus the ones already set up in Claude Code, used live; the registry is a search away. ![MCP](assets/screenshots/mcp.png) |
+| **Skills from hubs.** `official/security/godmode`, a GitHub folder, a skills.sh link: fetched, scanned and shown before anything is installed. ![Skill install](assets/screenshots/skill_install.png) | **Plugins.** The Hermes catalog and Claude Code marketplaces; the preview says what runs here and what doesn't. ![Plugin install](assets/screenshots/plugin_install.png) |
+| **Plugins tab.** Installed plugins, followed marketplaces, and what Claude Code itself has installed. ![Plugins](assets/screenshots/plugins.png) | **Skills.** Your skills, the project's (off until trusted), Claude Code's, and each one's scan verdict. ![Skills](assets/screenshots/skills.png) |
+| **Context.** `/context` breaks the next request down part by part, so you know what the model is actually reading. ![Context](assets/screenshots/context.png) | **Palette and themes.** `Ctrl+K` for every command; eleven themes with dim and bright variants and your own theme files. ![Themes](assets/screenshots/themes.png) |
 
 ## What makes it different
 

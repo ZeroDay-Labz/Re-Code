@@ -25,6 +25,24 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
   privacy settings names the settings page; requests carry an `X-Title: re-code` header.
 - Provider presets for Ollama Cloud, NVIDIA Build, Hugging Face, Mistral, DeepSeek, Together, Fireworks,
   Moonshot, Z.AI, MiniMax, xAI and Novita (OpenAI-compatible endpoints; chat not yet live-tested).
+- Skill hubs: `/skill install <what>` (or `i` on the Skills tab) fetches a skill from the Hermes index
+  (`official/security/godmode`, a bare name), GitHub (`owner/repo/folder[@ref]`, links), skills.sh, a
+  `SKILL.md` link or a local folder into a staging folder, scans it and shows a Hermes-style preview
+  (label, pinned commit, what it declares, files, tokens, scan) before `y` enable / `k` keep off / `n`
+  discard / `r` read. Nothing fetched is executed, no git is run. `/skill update <name>` (or `u`) shows the
+  files that would change, `/skill search <words>` searches the Hermes index. Each installed skill carries a
+  `.re-code-source.toml` with where it came from and which commit.
+- Saved chats can be deleted: `d` on a chat in the Home list or in the `/continue` picker asks, then removes
+  its messages, snapshot and compaction history. Deleting the open conversation starts a new one.
+- Plugins: a Plugins tab and `/plugin install <what>` install from the Hermes plugin catalog (a name such as
+  `better-session-appearance`), a Claude Code marketplace you follow (`/plugin marketplace add
+  anthropics/claude-plugins-official`, then `name@marketplace` or `b` to browse), GitHub, or a folder,
+  including what Claude Code itself has installed (listed read-only; Enter brings one over). The preview
+  uses Hermes' wording (`name [tier] pinned @ sha · maintained by …`) and says what runs here: a plugin's
+  skills and command files become skills and its `mcp.json` servers join the MCP tab; Python code, desktop
+  parts, agents and LSP servers are listed as not run; Claude Code hooks are translated into
+  `hooks.converted.toml` beside the plugin for you to copy, never loaded by themselves. `npm` and `command`
+  marketplace sources are refused because they run code on install.
 
 - Context windows per model with an automatic default: size, compaction trigger and reserve for the reply are
   tunable on the Settings tab and with `/autocompact`; cloud models are compacted too; `/compact <focus>`;
@@ -57,7 +75,19 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
   model with its own, empty context and reading tools by default; only its answer comes back, approvals
   go through the usual card, and tasks don't nest.
 
+- Memory that re-code keeps itself: the model saves facts with a `memory` tool (after approval, or always
+  once `a`/`p` is pressed), and later sessions get them back in the prompt. Project and user scopes, files
+  in re-code's data folder, `/memory` to list, edit and forget, a Settings row (on, read-only, off) and
+  `--no-memory`. Headless JSON lists `memories_changed`.
+- `read` reads a part of a file with `offset` and `limit`, and `read_result` pages through long results.
+
 ### Changed
+
+- No single tool result may take more than a quarter of the context window: longer ones are cut, with the
+  whole text a `read_result` away. When a request still won't fit, the newest results are shortened too.
+  This fixes conversations on small windows that refused every message after a few large reads.
+- A `task` row shows the helper's outcome only (its steps already show as rows), and a helper's compaction
+  is no longer reported as the main conversation's.
 
 - OpenCode Zen uses the address its own listing gives (`opencode.ai/inference/openai/v1`), and its $0
   models are hidden with the reason: OpenCode serves them only to its own app. `/free` offers OpenRouter.

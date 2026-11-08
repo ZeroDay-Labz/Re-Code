@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+ ╭ Skills ────────────────────────────────────────────────╮
+╭ Install a skill ─────────────────────────────────────────╮
+│ godmode   official   pinned @ 4134cbef                   │
+│ Run security tooling with every safeguard explained.     │
+│ Use for authorised testing.                              │
+│ declares no tools, hooks, middleware, or env vars · 7    │
+│ files · 13 kB · ~3.4k tokens when loaded                 │
+│ scan: clean                                              │
+│ Location  /home/someone/.config/re-code/skills/godmode   │
+│                                                          │
+│ Enable now?                                              │
+│ y yes  k keep off  n discard  r read SKILL.md            │
+╰──────────────────────────────────────────────────────────╯
+ │                                                        │
+ │                                                        │
+ ╰────────────────────────────────────────────────────────╯
+ a add  i install  e edit  space on/off  d delete  s search

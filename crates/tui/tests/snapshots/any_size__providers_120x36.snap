@@ -8,7 +8,7 @@ expression: "screen(&draw(app, width, height))"
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
                                            a coding agent for your own machine
 
-   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Tools 2 │ Settings │
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Plugins 2 │ Tools 2 │ Settings │
   ╭ Model providers ─────────────────────────────────────────────────────────────────────────────────────────────────╮
   │❯ ✗ anthropic                                     Anthropic  failed │ anthropic                                   │
   │  ● openrouter               OpenAI-compatible  320 models  60 free │ Kind                                        │

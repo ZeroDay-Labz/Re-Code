@@ -50,6 +50,7 @@ pub(crate) fn classify(
     }
     match (status, kind.map(str::to_ascii_lowercase)) {
         (429, _) => ProviderError::RateLimited { url, retry_after, message },
+        (402, _) => ProviderError::PaymentRequired { url, message },
         (404, _) if is_policy_message(&message) => ProviderError::PolicyBlocked { url, message },
         (_, Some(kind)) if is_limit_kind(&kind) => ProviderError::RateLimited { url, retry_after, message },
         (401 | 403, _) => ProviderError::NeedsKey { url, message },
@@ -145,10 +146,16 @@ mod tests {
         assert!(matches!(gate, ProviderError::ClientOnly { .. }), "{gate:?}");
         assert!(gate.to_string().contains("only to its own app") && !gate.to_string().contains("Try again shortly"));
         assert!(matches!(classify("u", 401, None, None, "no".to_owned()), ProviderError::NeedsKey { .. }));
-        assert!(matches!(
-            classify("u", 402, Some("insufficient_quota"), None, "x".to_owned()),
-            ProviderError::Http { .. }
-        ));
+        // Hugging Face, for a model its listing doesn't call free (2026-11-07).
+        let paid = classify(
+            "https://router.huggingface.co/v1/chat/completions",
+            402,
+            None,
+            None,
+            "Purchase pre-paid credits to continue using Inference Providers.".to_owned(),
+        );
+        assert!(matches!(paid, ProviderError::PaymentRequired { .. }), "{paid:?}");
+        assert!(paid.to_string().contains("isn't free on your account"), "{paid}");
         // Gemini's OpenAI-compatible endpoint answers with an array around the error object.
         let gemini = r#"[{"error": {"code": 500, "message": "Internal error encountered.", "status": "INTERNAL"}}]"#;
         assert_eq!(extract_message(gemini), "Internal error encountered.");

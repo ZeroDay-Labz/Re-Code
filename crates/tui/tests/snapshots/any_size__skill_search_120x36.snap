@@ -1,0 +1,38 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+
+                                            █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
+                                            █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
+                                            █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
+                                           a coding agent for your own machine
+
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Plugins 2 │ Tools 2 │ Settings │
+  ╭ Skills ──────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │❯ ● review                                                    yours │ review                                      │
+  │  ○ from-repo                                               project │ Use this when something needs doing,        │
+  │  ● borrowed                                            claude code │ described at reasonable length.             │
+  │  ✗ damaged                                                   yours │                                             │
+  │            ╭ Search skill hubs ─────────────────────────────────────────────────────────────────────╮            │
+  │            │ Search  pdf▏                                                                           │stimated).  │
+  │            │                                                                                        │ills/review/│
+  │            │ ❯ pdf   community                                                                      │            │
+  │            │     Work with PDF files.  ·  anthropics/skills/skills/pdf                              │            │
+  │            │   pdf-forms   official                                                                 │hen you're  │
+  │            │     Fill PDF forms from structured data.  ·  NousResearch/hermes-agent/optional-skill… │th Ctrl+L.  │
+  │            │                                                                                        │            │
+  │            │ enter install  ↑↓ choose  type to search again  esc cancel                             │            │
+  │            │                                                                                        │            │
+  │            │                                                                                        │            │
+  │            ╰────────────────────────────────────────────────────────────────────────────────────────╯            │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  │                                                                    │                                             │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
+  Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
+           a add  i install  e edit  space on/off  d delete  s search  u update  tab next  ^R rescan  ^C quit

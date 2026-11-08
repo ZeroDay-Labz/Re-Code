@@ -154,6 +154,27 @@ environment variables, prompt-injection phrases and invisible characters. A `dan
 enabled at all; `caution` is shown with its findings and can be. The scanner is a filter for the obvious,
 not a proof of safety, and the interface says so.
 
+**Installing skills from hubs (implemented 2026-11-08, `crates/extensions/src/{fetch,skillhub}.rs`):**
+nothing fetched is ever executed. There is no `git clone` and no tarball: GitHub's tree listing names the
+files and the raw endpoint serves them, so only regular files are written (0644, or 0755 when git marks a
+script executable), symbolic links and submodules are skipped and reported as a caution, a path that
+leaves the folder is refused, and the folder is capped at 5 MB, 400 files and 2 MB per file. Files land in
+a staging folder under the cache, are read and scanned there, and move into the skills folder only when
+the user decides; a `dangerous` verdict can only be kept off. Every install is pinned to a commit and the
+pin is recorded in the skill's `.re-code-source.toml`, so an update shows exactly which files change. A
+`GITHUB_TOKEN` in the environment is sent to the GitHub API only and never stored; skills.sh's API answers
+anonymous requests with 401, so its links are served from the repository they point at and the window says
+so. The Hermes index (~42 MB JSON) is cached for a day and parsed with a typed schema; a stale copy is used
+with a note when the fetch fails.
+
+**Plugins (implemented 2026-11-08, `crates/extensions/src/plugins.rs`)** go through the same fetch layer
+and staging, with twice the size limits. Only two kinds of part ever run: skills (scanned like any other,
+a dangerous one keeps the whole plugin off) and MCP servers (started like any other server, approval and
+all). Python plugin code, desktop plugins, agents, LSP servers and programs are listed and never run.
+Claude Code hooks are translated into `hooks.converted.toml` inside the plugin folder so the user can read
+each command and copy the ones they want into their own `hooks.toml`; re-code never loads that file by
+itself. Marketplace sources of type `npm` or `command` are refused because installing them executes code.
+
 The first time a directory is opened, the user sees what's configured: instructions, hooks, MCP servers,
 custom tools. Until the user trusts it:
 
@@ -248,6 +269,15 @@ trusted they aren't sent and their `@path` imports aren't followed. Imports can'
 user's own files can't leave the home folder); a file over 32 KB is replaced by its path. `/init` and `#`
 notes write files only at the user's request, and keep an already trusted folder trusted, since the change
 is the user's own.
+
+## Memory
+
+Memories are written by the model, so a hostile file or tool result could try to plant one that steers every
+later session. Three things stand in the way. A save or forget always shows an approval card with the full
+text unless the user granted it for the session (`a`) or the project (`p`), and `/permissions` lists and
+revokes that grant. Memories live in re-code's own data folder, so a repository can't ship any and an
+untrusted folder can't add any. Text that looks like a key, token or password is refused. Plan mode and
+helper tasks can only read. Every memory is a plain file that `/memory` lists, opens and deletes.
 
 ## What leaves the machine for a cloud provider
 

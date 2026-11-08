@@ -938,7 +938,7 @@ fn status_line(app: &App, width: usize) -> Line<'static> {
 }
 
 /// A centred window where there's room, and the whole screen where there isn't.
-fn overlay_area(area: Rect, wanted_width: u16, wanted_height: u16) -> Rect {
+pub(crate) fn overlay_area(area: Rect, wanted_width: u16, wanted_height: u16) -> Rect {
     let width = if area.width < wanted_width + 4 { area.width } else { wanted_width };
     let height = if area.height < wanted_height + 2 { area.height } else { wanted_height };
     Rect::new(area.x + (area.width - width) / 2, area.y + (area.height - height) / 2, width, height)
@@ -975,6 +975,30 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Overlay::McpSearch { query, hits, selected, searching, error } => {
             draw_mcp_search(frame, area, &query, &hits, selected, searching, error.as_deref());
         }
+        Overlay::Install(state) => crate::install_view::draw_install(frame, area, &state),
+        Overlay::PluginBrowse { title, listings, filter, selected, loading, error } => {
+            crate::install_view::draw_plugin_browse(
+                frame,
+                area,
+                &title,
+                &listings,
+                &filter,
+                selected,
+                loading,
+                error.as_deref(),
+            );
+        }
+        Overlay::SkillSearch { query, hits, selected, searching, error, note } => {
+            let view = crate::install_view::SearchView {
+                query: &query,
+                hits: &hits,
+                selected,
+                searching,
+                error: error.as_deref(),
+                note: note.as_deref(),
+            };
+            crate::install_view::draw_skill_search(frame, area, &view);
+        }
         Overlay::ToolFilter { server, tools, selected } => draw_tool_filter(frame, area, &server, &tools, selected),
         Overlay::Sessions { sessions, selected } => draw_sessions(frame, area, &sessions, selected),
         Overlay::Themes { selected, .. } => draw_themes(frame, area, selected, &app.theme),
@@ -990,7 +1014,7 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
     }
 }
 
-fn boxed(frame: &mut Frame<'_>, rect: Rect, title: &str, lines: Vec<Line<'static>>) {
+pub(crate) fn boxed(frame: &mut Frame<'_>, rect: Rect, title: &str, lines: Vec<Line<'static>>) {
     frame.render_widget(Clear, rect);
     let width = usize::from(rect.width);
     let inner = width.saturating_sub(4);
@@ -1251,7 +1275,7 @@ fn draw_sessions(frame: &mut Frame<'_>, area: Rect, sessions: &[crate::link::Ses
         ]));
     }
     lines.push(Line::default());
-    lines.push(legend(&[("enter", "continue it"), ("esc", "cancel")], inner));
+    lines.push(legend(&[("enter", "continue it"), ("d", "delete"), ("esc", "cancel")], inner));
     boxed(frame, rect, "Sessions in this folder", lines);
 }
 
@@ -1331,6 +1355,7 @@ fn draw_confirm(frame: &mut Frame<'_>, area: Rect, confirm: &ConfirmState) {
 const HELP: &[(&str, &str)] = &[
     ("Enter", "Send"),
     ("Alt+Enter, Ctrl+J", "New line"),
+    ("Ctrl+Backspace", "Delete the word before the cursor (also Alt+Backspace; Ctrl+W back to a space)"),
     ("Esc", "Stop the agent, or close a window"),
     ("Ctrl+K", "Commands"),
     ("Ctrl+L", "Switch model"),
@@ -1587,8 +1612,9 @@ fn draw_memory(
     let mut lines = Vec::new();
     if files.is_empty() {
         lines.extend(wrap_plain(
-            "No instruction files yet. They're read with every request: RE-CODE.md (also AGENTS.md or CLAUDE.md) in \
-             the project, and your own in re-code's config folder.",
+            "No instruction files or memories yet. Instruction files are read with every request: RE-CODE.md (also \
+             AGENTS.md or CLAUDE.md) in the project, and your own in re-code's config folder. Memories are what \
+             re-code saves on its own while it works.",
             theme::muted(),
             inner,
         ));
@@ -1606,7 +1632,8 @@ fn draw_memory(
         };
         let status_style = if file.problem.is_some() || !file.trusted { theme::attention() } else { theme::muted() };
         let room = inner.saturating_sub(2 + status.width() + 2);
-        let path = truncate(&file.path, room.max(8));
+        let shown = file.memory.as_ref().map_or(file.path.as_str(), |(_, name)| name.as_str());
+        let path = truncate(shown, room.max(8));
         let fill = inner.saturating_sub(2 + path.width() + status.width());
         lines.push(Line::from(vec![
             Span::styled(if index == selected { "❯ " } else { "  " }, theme::accent().patch(base)),
@@ -1621,8 +1648,14 @@ fn draw_memory(
     if let Some(project) = project_path {
         lines.extend(wrap_plain(&format!("Project: {project}"), theme::muted(), inner));
     }
-    lines.push(legend(&[("enter", "edit"), ("n", "new for this project"), ("u", "yours"), ("esc", "close")], inner));
-    boxed(frame, rect, "Instruction files", lines);
+    let on_memory = files.get(selected).is_some_and(|file| file.memory.is_some());
+    let keys: &[(&str, &str)] = if on_memory {
+        &[("enter", "edit"), ("d", "forget"), ("u", "yours"), ("esc", "close")]
+    } else {
+        &[("enter", "edit"), ("n", "new for this project"), ("u", "yours"), ("esc", "close")]
+    };
+    lines.push(legend(keys, inner));
+    boxed(frame, rect, "Instructions and memory", lines);
 }
 
 /// A `# note`: which file it goes to.

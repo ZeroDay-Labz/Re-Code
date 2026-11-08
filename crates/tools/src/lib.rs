@@ -92,8 +92,8 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
     vec![
         def(
             "read",
-            "Read a file's contents, with line numbers. Paths are relative to the project, or absolute or ~/… for files elsewhere on this computer (the user is asked first).",
-            json!({"path": string}),
+            "Read a file's contents, with line numbers. Paths are relative to the project, or absolute or ~/… for files elsewhere on this computer (the user is asked first). For a long file, read the part you need with offset (the first line, from 1) and limit (how many lines); the result says how many lines the file has.",
+            json!({"path": string, "offset": {"type": "integer", "minimum": 1}, "limit": {"type": "integer", "minimum": 1}}),
             vec!["path"],
         ),
         def(
@@ -198,7 +198,7 @@ pub fn run_cancellable(
     let text = |key: &str| args.get(key).and_then(Value::as_str);
     match name {
         "read" => match text("path") {
-            Some(path) => read(workspace, path),
+            Some(path) => read(workspace, path, number(args, "offset"), number(args, "limit")),
             None => ToolOutput::error("read needs a 'path'."),
         },
         "list" => list(workspace, text("path").unwrap_or(".")),
@@ -229,22 +229,49 @@ pub fn run_cancellable(
     }
 }
 
-fn read(workspace: &Workspace, path: &str) -> ToolOutput {
+/// A whole number argument; models send these as numbers or as strings.
+fn number(args: &Value, key: &str) -> Option<usize> {
+    let value = args.get(key)?;
+    let number = value.as_u64().or_else(|| value.as_str().and_then(|text| text.trim().parse().ok()))?;
+    usize::try_from(number).ok().filter(|n| *n > 0)
+}
+
+/// Lines `offset..offset+limit` (from 1) of a file, numbered, at most `MAX_READ_BYTES` of them. When it
+/// stops before the end it says where the file goes on, so the model can read the next part.
+fn read(workspace: &Workspace, path: &str, offset: Option<usize>, limit: Option<usize>) -> ToolOutput {
     let bytes = match workspace.locate(path).and_then(|location| workspace.read_at(&location)) {
         Ok(bytes) => bytes,
         Err(error) => return ToolOutput::error(error),
     };
-    let truncated = bytes.len() > MAX_READ_BYTES;
-    let text = String::from_utf8_lossy(&bytes[..bytes.len().min(MAX_READ_BYTES)]);
+    let text = String::from_utf8_lossy(&bytes);
+    let total = text.lines().count();
+    let start = offset.unwrap_or(1);
+    if start > 1 && start > total {
+        return ToolOutput::error(format!("line {start} is past the end: {path} has {total} lines"));
+    }
+    let end = limit.map_or(total, |limit| (start - 1).saturating_add(limit).min(total));
     let mut numbered = String::new();
-    for (index, line) in text.lines().enumerate() {
-        numbered.push_str(&format!("{:>5}  {line}\n", index + 1));
+    let mut last = start - 1;
+    for (index, line) in text.lines().enumerate().take(end).skip(start - 1) {
+        let row = format!("{:>5}  {line}\n", index + 1);
+        if numbered.len() + row.len() > MAX_READ_BYTES && last >= start {
+            break;
+        }
+        numbered.push_str(&row);
+        last = index + 1;
     }
-    if truncated {
-        numbered.push_str("… (truncated)\n");
+    if last < total {
+        numbered.push_str(&format!(
+            "… (showing lines {start}–{last} of {total}; read with offset {} for more)\n",
+            last + 1
+        ));
     }
-    let lines = text.lines().count();
-    ToolOutput::ok(numbered, format!("{lines} lines"))
+    let summary = if start == 1 && last == total {
+        format!("{total} lines")
+    } else {
+        format!("lines {start}–{last} of {total}")
+    };
+    ToolOutput::ok(numbered, summary)
 }
 
 fn list(workspace: &Workspace, path: &str) -> ToolOutput {
@@ -422,6 +449,28 @@ fn tail(text: &str, limit: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_pages_through_a_long_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let workspace = Workspace::new(dir.path()).unwrap();
+        let text: String = (1..=50).map(|n| format!("line {n}\n")).collect();
+        std::fs::write(dir.path().join("long.txt"), text).unwrap();
+        let part = read(&workspace, "long.txt", Some(10), Some(5));
+        assert!(
+            part.content.starts_with("   10  line 10\n") && part.content.contains("   14  line 14\n"),
+            "{}",
+            part.content
+        );
+        assert!(part.content.contains("showing lines 10–14 of 50; read with offset 15 for more"), "{}", part.content);
+        assert_eq!(part.summary, "lines 10–14 of 50");
+        let whole = read(&workspace, "long.txt", None, None);
+        assert_eq!(whole.summary, "50 lines");
+        assert!(!whole.content.contains("for more"));
+        assert!(read(&workspace, "long.txt", Some(99), None).content.contains("past the end"));
+        assert_eq!(number(&json!({"offset": "7"}), "offset"), Some(7));
+        assert_eq!(number(&json!({"offset": 0}), "offset"), None);
+    }
 
     #[test]
     fn exact_edit_requires_a_unique_match() {

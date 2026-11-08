@@ -119,6 +119,8 @@ pub struct InstructionFileInfo {
     pub tokens: u64,
     pub trusted: bool,
     pub problem: Option<String>,
+    /// For a memory re-code saved: its scope ("project" or "user") and name, so it can be forgotten.
+    pub memory: Option<(String, String)>,
 }
 
 /// Where a `# note` goes.
@@ -165,6 +167,24 @@ pub enum UiEvent {
     McpSearch {
         query: String,
         hits: Vec<recode_core::extensions::McpSearchHit>,
+        error: Option<String>,
+    },
+    /// A skill was staged (or couldn't be), for the install window.
+    Install(recode_core::extensions::InstallOutcome),
+    /// A plugin was staged (or couldn't be), for the install window.
+    PluginInstall(recode_core::extensions::PluginOutcome),
+    /// What a marketplace or a plugin search offers.
+    PluginListings {
+        /// "hermes", a marketplace name, or "search: <words>".
+        title: String,
+        listings: Vec<recode_core::extensions::PluginListing>,
+        error: Option<String>,
+    },
+    /// Results of a skill hub search.
+    SkillSearch {
+        query: String,
+        hits: Vec<recode_core::extensions::SkillSearchHit>,
+        note: Option<String>,
         error: Option<String>,
     },
     Session(EventKind),
@@ -322,6 +342,11 @@ pub enum UiCommand {
         scope: NoteScope,
         text: String,
     },
+    /// Remove a memory re-code saved (scope "project" or "user").
+    ForgetMemory {
+        scope: String,
+        name: String,
+    },
     /// Show the messages a compaction replaced.
     ShowCompaction(u64),
     /// Start afresh; the current conversation stays saved.
@@ -332,6 +357,8 @@ pub enum UiCommand {
     AddFolder(String),
     /// List this folder's saved sessions, answered with `UiEvent::Sessions`.
     ListSessions,
+    /// Delete a saved session by id; the list is sent again afterwards.
+    DeleteSession(String),
     /// Remember a theme for next time.
     SetTheme {
         name: String,

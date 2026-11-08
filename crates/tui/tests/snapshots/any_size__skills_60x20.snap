@@ -21,4 +21,4 @@ expression: "screen(&draw(app, width, height))"
  │                                                        │
  │                                                        │
  ╰────────────────────────────────────────────────────────╯
- a add  e edit  space on/off  d delete  tab next  ^R rescan
+ a add  i install  e edit  space on/off  d delete  s search

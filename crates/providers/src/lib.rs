@@ -50,6 +50,12 @@ pub enum ProviderError {
         "{url} has no host for this model that your privacy settings allow ({message}). On OpenRouter, allow free endpoints at https://openrouter.ai/settings/privacy, or pick another model with Ctrl+L."
     )]
     PolicyBlocked { url: String, message: String },
+    /// The account must pay for this model first (HTTP 402): it isn't free for this key, whatever a
+    /// listing said.
+    #[error(
+        "{url} wants payment before it serves this model ({message}). It isn't free on your account: add credits with the provider, or pick another model with Ctrl+L."
+    )]
+    PaymentRequired { url: String, message: String },
     /// The server wants a valid API key.
     #[error(
         "{url} needs a valid API key ({message}). Add one on the Providers tab, or type /free for a free-models key."

@@ -84,7 +84,7 @@ can't run a tool or call a provider directly, which keeps other clients possible
 | Later crate | Arrives | Justification |
 | --- | --- | --- |
 | `runtime` | **Exists (2026-11-07)** | Discovery of Ollama, llama.cpp, vLLM and LM Studio through podman/docker, systemd/Quadlet, `/proc` and identify-by-response probes; read-only, every step time-boxed. Hardware detection still lives in `app/doctor` until a second caller needs it. |
-| `extensions` | **Exists** | Stores MCP servers, skills and custom tools, and tests MCP connections. Keeps the `rmcp` dependency isolated. |
+| `extensions` | **Exists** | Stores MCP servers, skills and custom tools, and tests MCP connections. Keeps the `rmcp` dependency isolated. Also the skill hubs (`fetch` = GitHub API/raw, skills.sh, cached Hermes index; `skillhub` = tap parsing, staging, preview, commit, update), chosen over git or tarballs because installs must execute nothing and the Hermes repository's tarball is 90 MB. |
 | `harness` | With the first external agent | Separate concept from providers |
 | `ide` (ACP, IPC) | M6 | Separate protocol surface |
 

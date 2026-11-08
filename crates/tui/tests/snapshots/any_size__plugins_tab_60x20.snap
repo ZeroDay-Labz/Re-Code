@@ -1,0 +1,24 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                          ◆ re-code
+
+  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
+ ╭ Plugins and marketplaces ──────────────────────────────╮
+ │❯ ● context7                                            │
+ │  ◌ better-se…  community @ 3ee27002 · nothing runs here│
+ │  ⌂ claude-plugins-official    marketplace · 317 plugins│
+ │  ◇ rust-analyzer-lsp@c…  installed in Claude Code 1.0.0│
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ │                                                        │
+ ╰────────────────────────────────────────────────────────╯
+ i install  b browse  s search  m marketplace  space on/off

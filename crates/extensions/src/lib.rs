@@ -4,17 +4,20 @@
 
 pub mod catalog;
 pub mod claude;
+pub mod fetch;
 pub mod frontmatter;
 pub mod hub;
 pub mod paste;
+pub mod plugins;
 mod probe;
 pub mod registry;
 pub mod scan;
+pub mod skillhub;
 pub mod skills;
 
 pub use probe::probe;
 
-use recode_core::extensions::{CustomTool, ExtensionsSnapshot, McpServer, ToolFilter, validate_name};
+use recode_core::extensions::{CustomTool, ExtensionsSnapshot, Marketplace, McpServer, ToolFilter, validate_name};
 use recode_core::providers::CloudProvider;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -61,6 +64,12 @@ struct FileContents {
     /// Servers read from Claude Code whose tools go straight to the model.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     external_exposed: BTreeSet<String>,
+    /// Installed plugins switched off (their skills and servers stay out of the way).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    disabled_plugins: BTreeSet<String>,
+    /// Claude Code marketplaces followed, with the commit each manifest was read at.
+    #[serde(default, rename = "marketplace", skip_serializing_if = "Vec::is_empty")]
+    marketplaces: Vec<Marketplace>,
 }
 
 /// Where everything lives.
@@ -77,6 +86,10 @@ pub struct Locations {
     pub claude_config: Option<PathBuf>,
     /// The project folder, for Claude Code's per-project servers.
     pub project: Option<PathBuf>,
+    /// Installed plugins, one folder each (under re-code's data directory).
+    pub plugins_dir: PathBuf,
+    /// Claude Code's plugin records (`~/.claude/plugins`), listed read-only.
+    pub claude_plugins: Option<PathBuf>,
 }
 
 /// The stored configuration.
@@ -108,12 +121,56 @@ impl Extensions {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => (FileContents::default(), None),
             Err(error) => (FileContents::default(), Some(format!("{}: {error}", locations.config_file.display()))),
         };
-        let external = locations
+        let mut external = locations
             .claude_config
             .as_deref()
             .map(|config| claude::servers(config, locations.project.as_deref()))
             .unwrap_or_default();
+        external.extend(plugin_servers(&locations.plugins_dir, &contents.disabled_plugins));
         Self { locations, contents, load_error, external, project_trusted: false }
+    }
+
+    /// Re-reads what plugins bring (after an install, removal or on/off change).
+    pub fn reload_plugins(&mut self) {
+        self.external.retain(|server| !server.external.as_ref().is_some_and(|e| e.label.starts_with("plugin ")));
+        self.external.extend(plugin_servers(&self.locations.plugins_dir, &self.contents.disabled_plugins));
+    }
+
+    /// Switches an installed plugin on or off.
+    pub fn set_plugin_enabled(&mut self, name: &str, enabled: bool) -> Result<(), ExtensionError> {
+        set_flag(&mut self.contents.disabled_plugins, name, !enabled);
+        self.save()?;
+        self.reload_plugins();
+        Ok(())
+    }
+
+    /// Forgets a plugin's on/off choice once its folder is gone.
+    pub fn forget_plugin(&mut self, name: &str) -> Result<(), ExtensionError> {
+        self.contents.disabled_plugins.remove(name);
+        self.reload_plugins();
+        self.save()
+    }
+
+    /// The marketplaces followed.
+    #[must_use]
+    pub fn marketplaces(&self) -> &[Marketplace] {
+        &self.contents.marketplaces
+    }
+
+    pub fn add_marketplace(&mut self, market: Marketplace) -> Result<(), ExtensionError> {
+        self.contents.marketplaces.retain(|m| m.name != market.name);
+        self.contents.marketplaces.push(market);
+        self.contents.marketplaces.sort_by(|a, b| a.name.cmp(&b.name));
+        self.save()
+    }
+
+    pub fn remove_marketplace(&mut self, name: &str) -> Result<(), ExtensionError> {
+        let before = self.contents.marketplaces.len();
+        self.contents.marketplaces.retain(|m| m.name != name);
+        if self.contents.marketplaces.len() == before {
+            return Err(ExtensionError::Invalid(format!("You don't follow a marketplace called {name}.")));
+        }
+        self.save()
     }
 
     /// re-code's own servers, then Claude Code's with this file's choices applied. A server of
@@ -142,7 +199,15 @@ impl Extensions {
         ExtensionsSnapshot {
             servers: self.all_servers(),
             tools: self.contents.tools.clone(),
-            skills: skills::discover(&self.locations, &self.contents.disabled_skills, self.project_trusted),
+            skills: skills::discover(
+                &self.locations,
+                &self.contents.disabled_skills,
+                self.project_trusted,
+                &self.contents.disabled_plugins,
+            ),
+            plugins: plugins::discover(&self.locations.plugins_dir, &self.contents.disabled_plugins),
+            marketplaces: self.contents.marketplaces.clone(),
+            claude_plugins: self.locations.claude_plugins.as_deref().map(plugins::claude_installed).unwrap_or_default(),
             providers: self.contents.providers.clone(),
             config_path: self.locations.config_file.display().to_string(),
             load_error: self.load_error.clone(),
@@ -316,6 +381,20 @@ impl Extensions {
     }
 }
 
+/// The MCP servers of every enabled plugin.
+fn plugin_servers(plugins_dir: &Path, disabled: &BTreeSet<String>) -> Vec<McpServer> {
+    let Ok(entries) = std::fs::read_dir(plugins_dir) else { return Vec::new() };
+    let mut servers = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if disabled.contains(&name) || !entry.path().is_dir() {
+            continue;
+        }
+        servers.extend(plugins::servers_of(&entry.path(), &name));
+    }
+    servers
+}
+
 fn upsert<T>(
     items: &mut Vec<T>,
     original: Option<&str>,
@@ -368,6 +447,8 @@ mod tests {
             claude_skills: Some(dir.join("claude/skills")),
             claude_config: Some(dir.join("claude.json")),
             project: Some(dir.join("project")),
+            plugins_dir: dir.join("data/plugins"),
+            claude_plugins: Some(dir.join("claude/plugins")),
         }
     }
 

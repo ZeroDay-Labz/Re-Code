@@ -63,6 +63,18 @@ impl Catalog {
                     context: model.limit.as_ref().and_then(|limit| limit.context),
                     free: model.cost.as_ref().map(|cost| cost.input == Some(0.0) && cost.output == Some(0.0)),
                     price: model.cost.as_ref().and_then(|cost| cost.input.zip(cost.output)),
+                    cached_price: model.cost.as_ref().and_then(|cost| cost.cache_read),
+                    display_name: model.name.clone(),
+                    description: None,
+                    max_output: model.limit.as_ref().and_then(|limit| limit.output),
+                    modalities: ModelFacts::modalities_of(
+                        &model.modalities.input.iter().map(String::as_str).collect::<Vec<_>>(),
+                        &model.modalities.output.iter().map(String::as_str).collect::<Vec<_>>(),
+                    ),
+                    released: model.release_date.clone(),
+                    knowledge: model.knowledge.clone(),
+                    retires: None,
+                    hosts: None,
                 };
                 // Full id wins; a bare short id is only inserted if not already present.
                 if let Some(short) = id.rsplit('/').next().filter(|short| *short != id) {
@@ -105,23 +117,35 @@ struct WireModel {
     tool_call: bool,
     limit: Option<Limit>,
     cost: Option<Cost>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    release_date: Option<String>,
+    #[serde(default)]
+    knowledge: Option<String>,
 }
 
 #[derive(Default, Deserialize)]
 struct Modalities {
     #[serde(default)]
     input: Vec<String>,
+    #[serde(default)]
+    output: Vec<String>,
 }
 
 #[derive(Deserialize)]
 struct Limit {
     context: Option<u64>,
+    #[serde(default)]
+    output: Option<u64>,
 }
 
 #[derive(Deserialize)]
 struct Cost {
     input: Option<f64>,
     output: Option<f64>,
+    #[serde(default)]
+    cache_read: Option<f64>,
 }
 
 #[cfg(test)]

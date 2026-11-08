@@ -8,7 +8,7 @@ expression: "screen(&draw(app, width, height))"
                                             █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
                                            a coding agent for your own machine
 
-   Home │ Models 5 │ Runtimes 2 │ Providers 3 │ MCP 4 │ Skills 4 │ Tools 2 │ Settings │
+   Home │ Models 5 │ Runtimes 2 │ Providers 3 │ MCP 4 │ Skills 4 │ Plugins 2 │ Tools 2 │ Settings │
   ╭ Runtimes and containers ─────────────────────────────────────────────────────────────────────────────────────────╮
   │ podman 5.8.9 rootless                                                  │ Ollama                                  │
   │ Runtimes ────────────────────────────────────────────────────────────  │  running 0.40.14                        │

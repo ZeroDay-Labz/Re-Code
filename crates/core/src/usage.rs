@@ -54,6 +54,8 @@ pub enum ComponentKind {
     System,
     /// Instruction files from the user and the project.
     ProjectInstructions,
+    /// What re-code remembered from earlier sessions (the memory index).
+    Memory,
     /// The list of skills the model may load.
     SkillsIndex,
     /// A skill the user invoked for this request, in full.
@@ -80,6 +82,7 @@ impl ComponentKind {
         match self {
             Self::System => "System prompt",
             Self::ProjectInstructions => "Project instructions",
+            Self::Memory => "Memory",
             Self::SkillsIndex => "Skills index",
             Self::InvokedSkill => "Invoked skill",
             Self::McpNote => "MCP note",

@@ -61,6 +61,16 @@ pub struct JsonResult {
     pub context: Option<ContextFigures>,
     pub notices: Vec<String>,
     pub denied: Vec<String>,
+    /// What re-code's memory gained or lost during the run.
+    pub memories_changed: Vec<MemoryChange>,
+}
+
+/// A memory saved or forgotten during the run.
+#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
+pub struct MemoryChange {
+    pub action: String,
+    pub scope: String,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -75,6 +85,7 @@ pub struct Collector {
     pub result: JsonResult,
     text: String,
     calls: HashMap<String, usize>,
+    memory_calls: HashMap<String, MemoryChange>,
     turns_open: usize,
     finished: Option<TurnOutcome>,
 }
@@ -90,6 +101,12 @@ impl Collector {
             }
             EventKind::TextDelta { text } => self.text.push_str(text),
             EventKind::ToolCallRequested { call } => {
+                let field = |key: &str| call.arguments.get(key).and_then(|v| v.as_str()).unwrap_or_default().to_owned();
+                if call.name == "memory" && matches!(field("action").as_str(), "save" | "forget") {
+                    let scope = if field("scope") == "user" { "user".to_owned() } else { "project".to_owned() };
+                    let change = MemoryChange { action: field("action"), scope, name: field("name") };
+                    self.memory_calls.insert(call.id.clone(), change);
+                }
                 self.calls.insert(call.id.clone(), self.result.tool_calls.len());
                 self.result.tool_calls.push(ToolCallSummary {
                     name: call.name.clone(),
@@ -99,6 +116,11 @@ impl Collector {
                 });
             }
             EventKind::ToolFinished { call_id, success, .. } => {
+                if let Some(change) = self.memory_calls.remove(call_id)
+                    && *success
+                {
+                    self.result.memories_changed.push(change);
+                }
                 if let Some(index) = self.calls.get(call_id)
                     && let Some(call) = self.result.tool_calls.get_mut(*index)
                 {

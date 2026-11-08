@@ -21,4 +21,4 @@ expression: "screen(&draw(app, width, height))"
  │                                                        │
  │                                                        │
  ╰────────────────────────────────────────────────────────╯
-  enter start  ↑↓ choose  type to filter  ^F free ○  k key
+ enter start  ↑↓ choose  ^F free ○  ^T tools ○  ^V vision ○

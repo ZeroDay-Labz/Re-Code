@@ -10,7 +10,8 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use recode_core::extensions::{
-    CustomTool, ExtensionsSnapshot, McpProbe, McpServer, McpTransport, ProviderProbe, Skill, SkillSource,
+    CustomTool, ExtensionsSnapshot, McpProbe, McpServer, McpTransport, Plugin, PluginPart, ProviderProbe, Skill,
+    SkillSource,
 };
 use recode_core::providers::CloudProvider;
 use unicode_width::UnicodeWidthStr;
@@ -24,6 +25,12 @@ struct Row {
     name: String,
     right: String,
     enabled: bool,
+}
+
+impl Row {
+    fn blank() -> Self {
+        Self { marker: " ", marker_style: Style::new(), name: String::new(), right: String::new(), enabled: false }
+    }
 }
 
 fn server_row(server: &McpServer, extensions: &ExtensionsSnapshot) -> Row {
@@ -64,6 +71,7 @@ fn skill_row(skill: &Skill) -> Row {
         SkillSource::User => "yours",
         SkillSource::Project => "project",
         SkillSource::ClaudeCode => "claude code",
+        SkillSource::Plugin => "plugin",
     };
     let (marker, marker_style) = match (&skill.problem, skill.scan.blocks(), skill.enabled) {
         (_, true, _) => ("⚠", Style::new().fg(color(Token::Danger))),
@@ -71,11 +79,154 @@ fn skill_row(skill: &Skill) -> Row {
         (None, _, true) => ("●", Style::new().fg(color(Token::Success))),
         (None, _, false) => ("○", theme::muted()),
     };
+    let source = match &skill.installed_from {
+        Some(installed) => installed.pin_text(),
+        None => source.to_owned(),
+    };
     let right = match &skill.scan {
-        recode_core::extensions::Verdict::Clean => source.to_owned(),
+        recode_core::extensions::Verdict::Clean => source,
         verdict => format!("{source} · {}", verdict.label()),
     };
     Row { marker, marker_style, name: skill.name.clone(), right, enabled: skill.enabled }
+}
+
+/// What the Plugins tab lists: installed plugins, then followed marketplaces, then what Claude Code has.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PluginRow {
+    Plugin(usize),
+    Marketplace(usize),
+    Claude(usize),
+}
+
+#[must_use]
+pub fn plugin_rows(extensions: &ExtensionsSnapshot) -> Vec<PluginRow> {
+    let mut rows: Vec<PluginRow> = (0..extensions.plugins.len()).map(PluginRow::Plugin).collect();
+    rows.extend((0..extensions.marketplaces.len()).map(PluginRow::Marketplace));
+    rows.extend((0..extensions.claude_plugins.len()).map(PluginRow::Claude));
+    rows
+}
+
+fn plugin_row(row: &PluginRow, extensions: &ExtensionsSnapshot) -> Row {
+    match row {
+        PluginRow::Plugin(index) => {
+            let Some(plugin) = extensions.plugins.get(*index) else { return Row::blank() };
+            let running = plugin.parts.iter().filter(|part| part.runs_here()).count();
+            let (marker, marker_style) = if !plugin.enabled {
+                ("○", theme::muted())
+            } else if running == 0 {
+                ("◌", theme::muted())
+            } else {
+                ("●", Style::new().fg(color(Token::Success)))
+            };
+            let brings = match running {
+                0 => "nothing runs here".to_owned(),
+                1 => "1 part".to_owned(),
+                n => format!("{n} parts"),
+            };
+            Row {
+                marker,
+                marker_style,
+                name: plugin.name.clone(),
+                right: format!("{} · {brings}", plugin.source.pin_text()),
+                enabled: plugin.enabled,
+            }
+        }
+        PluginRow::Marketplace(index) => {
+            let Some(market) = extensions.marketplaces.get(*index) else { return Row::blank() };
+            Row {
+                marker: "⌂",
+                marker_style: Style::new().fg(color(Token::Attention)),
+                name: market.name.clone(),
+                right: format!("marketplace · {} plugins", market.plugin_count),
+                enabled: true,
+            }
+        }
+        PluginRow::Claude(index) => {
+            let Some(info) = extensions.claude_plugins.get(*index) else { return Row::blank() };
+            let version = info.version.as_deref().map(|v| format!(" {v}")).unwrap_or_default();
+            Row {
+                marker: "◇",
+                marker_style: theme::muted(),
+                name: info.key.clone(),
+                right: format!("installed in Claude Code{version}"),
+                enabled: false,
+            }
+        }
+    }
+}
+
+fn plugin_details(row: &PluginRow, extensions: &ExtensionsSnapshot, width: usize) -> Vec<Line<'static>> {
+    match row {
+        PluginRow::Plugin(index) => {
+            extensions.plugins.get(*index).map(|plugin| plugin_lines(plugin, width)).unwrap_or_default()
+        }
+        PluginRow::Marketplace(index) => {
+            let Some(market) = extensions.marketplaces.get(*index) else { return Vec::new() };
+            let mut lines = heading(&market.name, width);
+            lines.extend(wrap_plain(&format!("A Claude Code marketplace at {}.", market.repo), Style::new(), width));
+            if !market.sha.is_empty() {
+                lines.extend(wrap_plain(
+                    &format!("Manifest read at {}.", &market.sha[..8.min(market.sha.len())]),
+                    theme::muted(),
+                    width,
+                ));
+            }
+            lines.extend(wrap_plain(
+                &format!("{} plugins listed. Press b to browse them, d to stop following.", market.plugin_count),
+                theme::muted(),
+                width,
+            ));
+            lines
+        }
+        PluginRow::Claude(index) => {
+            let Some(info) = extensions.claude_plugins.get(*index) else { return Vec::new() };
+            let mut lines = heading(&info.key, width);
+            lines.extend(wrap_plain(
+                "Installed by Claude Code. Read-only here; its hooks never run.",
+                Style::new(),
+                width,
+            ));
+            lines.extend(wrap_plain("Press Enter to bring its skills and MCP servers into re-code (installed from its folder as a local plugin).", theme::muted(), width));
+            lines.extend(wrap_plain(&info.install_path, theme::faint(), width));
+            lines
+        }
+    }
+}
+
+fn plugin_lines(plugin: &Plugin, width: usize) -> Vec<Line<'static>> {
+    let mut lines = heading(&plugin.name, width);
+    if !plugin.description.is_empty() {
+        lines.extend(wrap_plain(&plugin.description, Style::new(), width));
+    }
+    lines.extend(wrap_plain(&plugin.header(), theme::muted(), width));
+    lines.extend(wrap_plain(&plugin.capability_sentence(), theme::muted(), width));
+    if let Some(version) = &plugin.version {
+        lines.extend(wrap_plain(&format!("Version {version}"), theme::muted(), width));
+    }
+    lines.push(Line::default());
+    for part in plugin.parts.iter().take(12) {
+        let style = if part.runs_here() { Style::new() } else { theme::muted() };
+        let mark = if part.runs_here() { "• " } else { "· " };
+        lines.extend(wrap_plain(&format!("{mark}{}", part.describe()), style, width));
+    }
+    if plugin.parts.len() > 12 {
+        lines.extend(wrap_plain(&format!("…and {} more.", plugin.parts.len() - 12), theme::muted(), width));
+    }
+    if plugin.parts.iter().any(|part| matches!(part, PluginPart::Hook { converted: true, .. })) {
+        lines.extend(wrap_plain(
+            "Converted hooks are in hooks.converted.toml inside the plugin; copy what you want into your hooks.toml.",
+            theme::muted(),
+            width,
+        ));
+    }
+    lines.push(Line::default());
+    lines.extend(wrap_plain(&plugin.directory, theme::faint(), width));
+    lines.extend(wrap_plain(
+        "Space switches it on or off, u checks for an update, d removes it.",
+        theme::muted(),
+        width,
+    ));
+    lines
 }
 
 fn tool_row(tool: &CustomTool) -> Row {
@@ -177,6 +328,7 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, tab: HomeTab, sele
         HomeTab::Providers => extensions.providers.iter().map(|provider| provider_row(provider, &extensions)).collect(),
         HomeTab::Mcp => extensions.servers.iter().map(|server| server_row(server, &extensions)).collect(),
         HomeTab::Skills => extensions.skills.iter().map(skill_row).collect(),
+        HomeTab::Plugins => plugin_rows(&extensions).iter().map(|row| plugin_row(row, &extensions)).collect(),
         HomeTab::Tools => extensions.tools.iter().map(tool_row).collect(),
         HomeTab::Models | HomeTab::Home | HomeTab::Settings | HomeTab::Runtimes => return,
     };
@@ -199,6 +351,9 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App, tab: HomeTab, sele
             HomeTab::Mcp => extensions.servers.get(selected).map(|server| server_details(server, &extensions, width)),
             HomeTab::Skills => extensions.skills.get(selected).map(|skill| skill_details(skill, width)),
             HomeTab::Tools => extensions.tools.get(selected).map(|tool| tool_details(tool, width)),
+            HomeTab::Plugins => {
+                plugin_rows(&extensions).get(selected).map(|row| plugin_details(row, &extensions, width))
+            }
             HomeTab::Models | HomeTab::Home | HomeTab::Settings | HomeTab::Runtimes => None,
         };
         frame.render_widget(Paragraph::new(lines.unwrap_or_default()), details);
@@ -219,6 +374,10 @@ fn draw_empty(frame: &mut Frame<'_>, area: Rect, tab: HomeTab) {
         HomeTab::Skills => (
             "No skills yet.",
             "Press a to create one. A skill is a set of instructions that a model loads only when they're relevant.",
+        ),
+        HomeTab::Plugins => (
+            "No plugins yet.",
+            "Press i to install one from the Hermes catalog (a name such as better-session-appearance), a Claude Code marketplace (m adds one, b browses it), GitHub, or a folder. A plugin's skills and MCP servers work here; its Python code, desktop parts and hooks are listed, not run.",
         ),
         _ => ("No custom tools yet.", "Press a to add one. A custom tool lets a model run a command that you define."),
     };
@@ -371,6 +530,19 @@ fn skill_details(skill: &Skill, width: usize) -> Vec<Line<'static>> {
         lines.extend(wrap_plain(problem, Style::new().fg(color(Token::Danger)), width));
     }
     lines.push(Line::default());
+    if let Some(installed) = &skill.installed_from {
+        let pin = if installed.sha.len() >= 8 { format!(" at {}", &installed.sha[..8]) } else { String::new() };
+        let from = if installed.path.is_empty() {
+            installed.repo.clone()
+        } else {
+            format!("{}, folder {}", installed.repo, installed.path)
+        };
+        lines.extend(wrap_plain(
+            &format!("Installed from {} ({from}{pin}). Press u to check for an update.", installed.tap),
+            theme::muted(),
+            width,
+        ));
+    }
     let source = match (skill.source, skill.trusted) {
         (SkillSource::User, _) => "Yours. Press e to edit it.",
         (SkillSource::Project, false) => {
@@ -378,6 +550,7 @@ fn skill_details(skill: &Skill, width: usize) -> Vec<Line<'static>> {
         }
         (SkillSource::Project, true) => "From this project (trusted).",
         (SkillSource::ClaudeCode, _) => "Found in Claude Code's directory. Read-only here.",
+        (SkillSource::Plugin, _) => "Part of an installed plugin (Plugins tab). Removed with it.",
     };
     lines.extend(wrap_plain(source, theme::muted(), width));
     if let Some(license) = &skill.license {

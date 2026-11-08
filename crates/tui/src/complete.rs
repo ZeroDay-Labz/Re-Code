@@ -49,6 +49,17 @@ pub const SLASH_COMMANDS: &[SlashCommand] = &[
     SlashCommand { name: "theme", argument: "", description: "Change the colours" },
     SlashCommand { name: "free", argument: "", description: "Get free models (OpenRouter)" },
     SlashCommand { name: "trust", argument: "", description: "Trust this folder's configuration (project skills)" },
+    SlashCommand {
+        name: "skill",
+        argument: "install|search|update [what]",
+        description: "Install a skill from a hub (Hermes, GitHub, skills.sh), search, or update one",
+    },
+    SlashCommand { name: "plugins", argument: "", description: "Plugins and marketplaces" },
+    SlashCommand {
+        name: "plugin",
+        argument: "install|search|browse|update|marketplace add|remove [what]",
+        description: "Install a plugin (Hermes catalog, Claude Code marketplaces, GitHub), or follow a marketplace",
+    },
     SlashCommand { name: "files", argument: "", description: "The project's files in the side panel" },
     SlashCommand { name: "reasoning", argument: "", description: "Show or hide reasoning" },
     SlashCommand { name: "panel", argument: "", description: "Show or hide the side panel" },

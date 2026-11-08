@@ -2,6 +2,7 @@
 
 use crate::form::{ConfirmState, Confirmed, FormState};
 use crate::input::Input;
+use crate::install_view::InstallState;
 use crate::sanitize::sanitize;
 use crate::theme::ThemeSelection;
 use crate::transcript::{Entry, RenderOptions, ToolEntry, ToolStatus, Transcript};
@@ -76,6 +77,8 @@ pub enum Action {
     },
     /// Fetch prompts from every project, for the history search.
     LoadHistory,
+    /// Delete a saved session (the user confirmed).
+    DeleteSession(String),
     /// Write the whole conversation into the terminal's own scrollback, so native search and selection
     /// work on it, then come back.
     DumpScrollback(String),
@@ -102,6 +105,10 @@ pub enum Action {
     WriteNote {
         scope: crate::link::NoteScope,
         text: String,
+    },
+    ForgetMemory {
+        scope: String,
+        name: String,
     },
     /// Show the messages a compaction replaced.
     ShowCompaction(u64),
@@ -232,6 +239,26 @@ pub enum Overlay {
         searching: bool,
         error: Option<String>,
     },
+    /// Installing a skill from a hub: ask, fetch, preview, decide.
+    Install(InstallState),
+    /// A marketplace's or a search's plugins: type to filter, Enter fetches one.
+    PluginBrowse {
+        title: String,
+        listings: Vec<recode_core::extensions::PluginListing>,
+        filter: String,
+        selected: usize,
+        loading: bool,
+        error: Option<String>,
+    },
+    /// Searching the skill hubs: type, Enter searches, Enter on a hit fetches it.
+    SkillSearch {
+        query: String,
+        hits: Vec<recode_core::extensions::SkillSearchHit>,
+        selected: usize,
+        searching: bool,
+        error: Option<String>,
+        note: Option<String>,
+    },
     /// Choosing which of a server's tools the model may use.
     ToolFilter {
         server: String,
@@ -275,6 +302,8 @@ pub enum PaletteCommand {
     Theme,
     FreeModels,
     TrustProject,
+    InstallSkill,
+    InstallPlugin,
     Help,
     Quit,
 }
@@ -295,6 +324,8 @@ pub const PALETTE: &[(PaletteCommand, &str, &str)] = &[
     (PaletteCommand::Theme, "Change theme", ""),
     (PaletteCommand::FreeModels, "Get free models", "/free"),
     (PaletteCommand::TrustProject, "Trust this folder's configuration (project skills)", "/trust"),
+    (PaletteCommand::InstallSkill, "Install a skill from a hub (Hermes, GitHub, skills.sh)", "/skill install"),
+    (PaletteCommand::InstallPlugin, "Install a plugin (Hermes catalog, Claude Code marketplaces)", "/plugin install"),
     (PaletteCommand::Help, "Keyboard shortcuts", "F1"),
     (PaletteCommand::Quit, "Quit", "Ctrl+C twice"),
 ];
@@ -583,6 +614,9 @@ pub struct App {
     pub transcript_top: usize,
     /// Messages shown in the corner for a few seconds, newest last.
     pub toasts: VecDeque<Toast>,
+    /// Things an event asked of the driver, performed by the run loop after the event (an event
+    /// handler returns nothing itself).
+    pub pending_actions: Vec<Action>,
     /// Whether the terminal window has focus (for notifications).
     pub focused: bool,
     /// Settings remembered by the driver, as key → value.
@@ -850,6 +884,7 @@ impl App {
             transcript_rect: (0, 0, 0, 0),
             transcript_top: 0,
             toasts: VecDeque::new(),
+            pending_actions: Vec::new(),
             focused: true,
             settings: BTreeMap::new(),
             panel_tab: PanelTab::Session,
@@ -1283,7 +1318,7 @@ impl App {
         match model {
             Some(model) => {
                 if let Some(info) = &self.welcome_info {
-                    self.provider.clone_from(&info.provider_name);
+                    self.provider = provider_of(info, &model);
                     self.model_vision = info.models.iter().any(|m| m.name == model && m.vision);
                 }
                 self.model = model;
@@ -1750,6 +1785,40 @@ impl App {
             "mcp" => tab(self, HomeTab::Mcp),
             "tools" => tab(self, HomeTab::Tools),
             "skills" => tab(self, HomeTab::Skills),
+            "plugins" => tab(self, HomeTab::Plugins),
+            "plugin" => {
+                let mut words = argument.splitn(2, char::is_whitespace);
+                let verb = words.next().unwrap_or_default();
+                let rest = words.next().map(|rest| rest.trim().to_owned()).filter(|rest| !rest.is_empty());
+                match verb {
+                    "" => tab(self, HomeTab::Plugins),
+                    "install" | "add" | "i" => self.open_plugin_install(rest),
+                    "search" | "find" | "s" => self.open_plugin_search(rest),
+                    "update" | "u" => self.update_plugin(rest.as_deref().unwrap_or_default()),
+                    "browse" | "list" | "b" => self.browse_plugins(rest.as_deref().unwrap_or("hermes")),
+                    "marketplace" | "market" | "m" => {
+                        let mut words = rest.as_deref().unwrap_or_default().splitn(2, char::is_whitespace);
+                        let action = words.next().unwrap_or_default();
+                        let what = words.next().map(|w| w.trim().to_owned()).filter(|w| !w.is_empty());
+                        match (action, what) {
+                            ("add", Some(what)) => vec![Action::Extension(ExtensionCommand::AddMarketplace(what))],
+                            ("add", None) | ("", None) => self.open_marketplace_add(),
+                            ("remove" | "rm", Some(what)) => {
+                                vec![Action::Extension(ExtensionCommand::RemoveMarketplace(what))]
+                            }
+                            (other, what) => {
+                                // `/plugin marketplace owner/repo` adds it.
+                                let text = what.map(|w| format!("{other} {w}")).unwrap_or_else(|| other.to_owned());
+                                vec![Action::Extension(ExtensionCommand::AddMarketplace(text))]
+                            }
+                        }
+                    }
+                    other => self.open_plugin_install(Some(format!(
+                        "{other}{}",
+                        rest.map(|r| format!(" {r}")).unwrap_or_default()
+                    ))),
+                }
+            }
             "providers" => tab(self, HomeTab::Providers),
             "undo" => self.run_command(PaletteCommand::Undo),
             "compact" => {
@@ -1872,6 +1941,19 @@ impl App {
             "theme" | "themes" => self.run_command(PaletteCommand::Theme),
             "free" => self.run_command(PaletteCommand::FreeModels),
             "trust" => self.run_command(PaletteCommand::TrustProject),
+            "skill" => {
+                let mut words = argument.splitn(2, char::is_whitespace);
+                let verb = words.next().unwrap_or_default();
+                let rest = words.next().map(|rest| rest.trim().to_owned()).filter(|rest| !rest.is_empty());
+                match verb {
+                    "" | "install" | "add" | "i" => self.open_install(rest),
+                    "search" | "find" | "s" => self.open_skill_search(rest),
+                    "update" | "u" => self.update_skill(rest.as_deref().unwrap_or_default()),
+                    other => {
+                        self.open_install(Some(format!("{other}{}", rest.map(|r| format!(" {r}")).unwrap_or_default())))
+                    }
+                }
+            }
             "files" | "tree" => {
                 self.panel_preference = Some(true);
                 self.panel_tab = PanelTab::Files;
@@ -1989,9 +2071,32 @@ impl App {
                 let chosen = rows.get(welcome.extension_index(rows.len())).cloned();
                 return self.open_dash_item(chosen);
             }
+            KeyCode::Char('d') => {
+                if let Some(crate::home::DashItem::Resume(id, label)) =
+                    rows.get(welcome.extension_index(rows.len())).cloned()
+                {
+                    self.confirm_delete_session(id, label);
+                }
+            }
             _ => {}
         }
         Vec::new()
+    }
+
+    /// Asks before a saved chat is deleted, from the Home list or the session picker.
+    fn confirm_delete_session(&mut self, id: String, label: String) {
+        if self.demo {
+            self.toast("That isn't available in the demo recording.", ToastLevel::Info);
+            return;
+        }
+        self.overlay = Some(Overlay::Confirm(ConfirmState {
+            title: "Delete this chat?".to_owned(),
+            body: vec![
+                label,
+                "Its messages, saved snapshot and compaction history are removed. If it's the conversation open now, a new one starts.".to_owned(),
+            ],
+            command: Confirmed::DeleteSession(id),
+        }));
     }
 
     fn open_dash_item(&mut self, item: Option<crate::home::DashItem>) -> Vec<Action> {
@@ -2167,6 +2272,10 @@ impl App {
             SettingKind::Notifications if step != 0 => {
                 let current = self.settings.get("notifications").cloned().unwrap_or_else(|| "both".to_owned());
                 self.set_setting("notifications", cycle(&NOTIFICATION_CHOICES, &current, step))
+            }
+            SettingKind::Memory if step != 0 => {
+                let current = self.settings.get("memory").cloned().unwrap_or_else(|| "on".to_owned());
+                self.set_setting("memory", cycle(&crate::home::MEMORY_CHOICES, &current, step))
             }
             SettingKind::LineNumbers if step != 0 => {
                 let on = self.settings.get("line_numbers").is_some_and(|v| v == "on");
@@ -2383,6 +2492,7 @@ impl App {
             KeyCode::Char('f') if ctrl => welcome.toggle(|only| &mut only.free, self.welcome_info.as_ref()),
             KeyCode::Char('t') if ctrl => welcome.toggle(|only| &mut only.tools, self.welcome_info.as_ref()),
             KeyCode::Char('v') if ctrl => welcome.toggle(|only| &mut only.vision, self.welcome_info.as_ref()),
+            KeyCode::Char('p') if ctrl => welcome.by_provider = !welcome.by_provider,
             KeyCode::Char('k') if !ctrl && welcome.filter.is_empty() => return self.key_for_selected(),
             KeyCode::Char(c) if !ctrl => {
                 let filter = format!("{}{c}", welcome.filter);
@@ -2504,7 +2614,7 @@ impl App {
         let Some(name) = chosen.and_then(|index| info.models.get(index)).map(|model| model.name.clone()) else {
             return Vec::new();
         };
-        self.provider.clone_from(&info.provider_name);
+        self.provider = provider_of(info, &name);
         if self.model != name {
             self.tokens_per_second = None;
         }
@@ -2546,6 +2656,14 @@ impl App {
             KeyCode::Char('i') if tab == HomeTab::Mcp => {
                 return vec![Action::Extension(ExtensionCommand::ImportClaudeMcp)];
             }
+            KeyCode::Char('i') if tab == HomeTab::Skills => return self.open_install(None),
+            KeyCode::Char('s') if tab == HomeTab::Skills => return self.open_skill_search(None),
+            KeyCode::Char('u') if tab == HomeTab::Skills => return self.update_selected_skill(),
+            KeyCode::Char('i') if tab == HomeTab::Plugins => return self.open_plugin_install(None),
+            KeyCode::Char('m') if tab == HomeTab::Plugins => return self.open_marketplace_add(),
+            KeyCode::Char('b') if tab == HomeTab::Plugins => return self.browse_selected_marketplace(),
+            KeyCode::Char('s') if tab == HomeTab::Plugins => return self.open_plugin_search(None),
+            KeyCode::Char('u') if tab == HomeTab::Plugins => return self.update_selected_plugin(),
             KeyCode::Char('x') if tab == HomeTab::Mcp => return self.toggle_exposed(),
             KeyCode::Char('p') if tab == HomeTab::Mcp => self.overlay = Some(Overlay::McpPresets { selected: 0 }),
             KeyCode::Char('s') if tab == HomeTab::Mcp => {
@@ -2579,6 +2697,7 @@ impl App {
             HomeTab::Providers => extensions.providers.len(),
             HomeTab::Mcp => extensions.servers.len(),
             HomeTab::Skills => extensions.skills.len(),
+            HomeTab::Plugins => crate::extensions_view::plugin_rows(extensions).len(),
             HomeTab::Tools => extensions.tools.len(),
         }
     }
@@ -2588,6 +2707,26 @@ impl App {
         let extensions = self.extensions.as_ref()?;
         let index = welcome.extension_index(self.extension_count());
         Some((welcome.tab, index, extensions))
+    }
+
+    /// `u` on the Skills tab: check the selected installed skill for a newer version.
+    fn update_selected_skill(&mut self) -> Vec<Action> {
+        let Some((tab, index, extensions)) = self.selected_extension() else { return Vec::new() };
+        if tab != HomeTab::Skills {
+            return Vec::new();
+        }
+        match extensions.skills.get(index) {
+            Some(skill) if skill.installed_from.is_some() => {
+                let name = skill.name.clone();
+                self.update_skill(&name)
+            }
+            Some(skill) => {
+                let text = format!("{} wasn't installed from a hub, so there's nothing to update it from.", skill.name);
+                self.home_message = Some((text, true));
+                Vec::new()
+            }
+            None => Vec::new(),
+        }
     }
 
     fn edit_selected(&mut self) -> Vec<Action> {
@@ -2620,9 +2759,72 @@ impl App {
                     self.home_message = Some((text, true));
                 }
             }
+            HomeTab::Plugins => {
+                use crate::extensions_view::PluginRow;
+                match crate::extensions_view::plugin_rows(extensions).get(index) {
+                    Some(PluginRow::Claude(claude)) => {
+                        if let Some(info) = extensions.claude_plugins.get(*claude) {
+                            let path = info.install_path.clone();
+                            return self.open_plugin_install(Some(path));
+                        }
+                    }
+                    Some(PluginRow::Marketplace(_)) => return self.browse_selected_marketplace(),
+                    Some(PluginRow::Plugin(plugin)) => {
+                        if let Some(plugin) = extensions.plugins.get(*plugin) {
+                            let text = format!(
+                                "{} is a folder of files; its skills show on the Skills tab and its servers on the MCP tab.",
+                                plugin.name
+                            );
+                            self.home_message = Some((text, false));
+                        }
+                    }
+                    None => {}
+                }
+            }
             HomeTab::Models | HomeTab::Home | HomeTab::Settings | HomeTab::Runtimes => {}
         }
         Vec::new()
+    }
+
+    /// `u` on the Plugins tab: check the selected plugin for a newer version.
+    fn update_selected_plugin(&mut self) -> Vec<Action> {
+        use crate::extensions_view::PluginRow;
+        let Some((tab, index, extensions)) = self.selected_extension() else { return Vec::new() };
+        if tab != HomeTab::Plugins {
+            return Vec::new();
+        }
+        match crate::extensions_view::plugin_rows(extensions).get(index) {
+            Some(PluginRow::Plugin(plugin)) => {
+                let name = extensions.plugins.get(*plugin).map(|p| p.name.clone()).unwrap_or_default();
+                self.update_plugin(&name)
+            }
+            Some(PluginRow::Marketplace(market)) => {
+                // Re-reading a marketplace is adding it again at its newest commit.
+                let repo = extensions.marketplaces.get(*market).map(|m| m.repo.clone()).unwrap_or_default();
+                vec![Action::Extension(ExtensionCommand::AddMarketplace(repo))]
+            }
+            _ => {
+                self.home_message = Some(("Only installed plugins and marketplaces can be updated.".to_owned(), true));
+                Vec::new()
+            }
+        }
+    }
+
+    /// `b` on the Plugins tab: browse the selected marketplace, or the Hermes catalog.
+    fn browse_selected_marketplace(&mut self) -> Vec<Action> {
+        use crate::extensions_view::PluginRow;
+        let name = match self.selected_extension() {
+            Some((HomeTab::Plugins, index, extensions)) => {
+                match crate::extensions_view::plugin_rows(extensions).get(index) {
+                    Some(PluginRow::Marketplace(market)) => {
+                        extensions.marketplaces.get(*market).map(|m| m.name.clone()).unwrap_or_default()
+                    }
+                    _ => "hermes".to_owned(),
+                }
+            }
+            _ => "hermes".to_owned(),
+        };
+        self.browse_plugins(&name)
     }
 
     /// Keys on the Runtimes tab: choose a row, Enter offers to start a stopped runtime.
@@ -2872,12 +3074,37 @@ impl App {
                 }
                 None => return,
             },
+            HomeTab::Plugins => {
+                use crate::extensions_view::PluginRow;
+                match crate::extensions_view::plugin_rows(extensions).get(index) {
+                    Some(PluginRow::Plugin(plugin)) => match extensions.plugins.get(*plugin) {
+                        Some(plugin) => (plugin.name.clone(), ExtensionCommand::DeletePlugin(plugin.name.clone())),
+                        None => return,
+                    },
+                    Some(PluginRow::Marketplace(market)) => match extensions.marketplaces.get(*market) {
+                        Some(market) => (market.name.clone(), ExtensionCommand::RemoveMarketplace(market.name.clone())),
+                        None => return,
+                    },
+                    Some(PluginRow::Claude(_)) => {
+                        self.home_message = Some(("That's Claude Code's; remove it there.".to_owned(), true));
+                        return;
+                    }
+                    None => return,
+                }
+            }
             HomeTab::Models | HomeTab::Home | HomeTab::Settings | HomeTab::Runtimes => return,
         };
-        let body = if tab == HomeTab::Skills {
-            vec!["This permanently deletes the skill's directory and everything in it.".to_owned()]
-        } else {
-            vec!["This removes it from your configuration.".to_owned()]
+        let body = match (tab, &command) {
+            (HomeTab::Skills, _) => {
+                vec!["This permanently deletes the skill's directory and everything in it.".to_owned()]
+            }
+            (_, ExtensionCommand::DeletePlugin(_)) => {
+                vec!["This removes the plugin's folder with its skills and MCP servers.".to_owned()]
+            }
+            (_, ExtensionCommand::RemoveMarketplace(_)) => {
+                vec!["re-code stops following it. Plugins already installed from it stay.".to_owned()]
+            }
+            _ => vec!["This removes it from your configuration.".to_owned()],
         };
         self.overlay =
             Some(Overlay::Confirm(ConfirmState { title: format!("Delete {what}?"), body, command: command.into() }));
@@ -2898,6 +3125,16 @@ impl App {
                 .tools
                 .get(index)
                 .map(|tool| ExtensionCommand::SetToolEnabled(tool.name.clone(), !tool.enabled)),
+            HomeTab::Plugins => {
+                use crate::extensions_view::PluginRow;
+                match crate::extensions_view::plugin_rows(extensions).get(index) {
+                    Some(PluginRow::Plugin(plugin)) => extensions
+                        .plugins
+                        .get(*plugin)
+                        .map(|plugin| ExtensionCommand::SetPluginEnabled(plugin.name.clone(), !plugin.enabled)),
+                    _ => None,
+                }
+            }
             HomeTab::Skills => match extensions.skills.get(index) {
                 Some(skill) if skill.scan.blocks() => {
                     let text = format!(
@@ -3074,6 +3311,8 @@ impl App {
             KeyCode::Char('j') => self.input.insert("\n"),
             KeyCode::Char('u') => self.input.delete_to_line_start(),
             KeyCode::Char('w') => self.input.delete_word(),
+            // Ctrl+Backspace: as Backspace with Ctrl (keyboard protocol) or as ^H (VTE terminals).
+            KeyCode::Backspace | KeyCode::Char('h') => self.input.delete_word_back(),
             KeyCode::Char('a') => self.input.line_start(),
             KeyCode::Char('e') => return self.run_command(PaletteCommand::Extensions),
             _ => {}
@@ -3194,6 +3433,7 @@ impl App {
                     self.pending_images = images;
                 }
             }
+            KeyCode::Backspace if key.modifiers.contains(KeyModifiers::ALT) => self.input.delete_word_back(),
             KeyCode::Backspace => self.input.backspace(),
             KeyCode::Delete => self.input.delete(),
             KeyCode::Left if key.modifiers.contains(KeyModifiers::ALT) => self.input.word_left(),
@@ -3239,6 +3479,15 @@ impl App {
         }
         if matches!(self.overlay, Some(Overlay::FreeSetup(_))) {
             return self.free_setup_key(key);
+        }
+        if matches!(self.overlay, Some(Overlay::Install(_))) {
+            return self.install_key(key);
+        }
+        if matches!(self.overlay, Some(Overlay::SkillSearch { .. })) {
+            return self.skill_search_key(key);
+        }
+        if matches!(self.overlay, Some(Overlay::PluginBrowse { .. })) {
+            return self.plugin_browse_key(key);
         }
         let Some(overlay) = &mut self.overlay else { return Vec::new() };
         match overlay {
@@ -3295,6 +3544,14 @@ impl App {
                 KeyCode::Esc | KeyCode::Char('q') => self.overlay = None,
                 KeyCode::Up => *selected = selected.saturating_sub(1),
                 KeyCode::Down => *selected = (*selected + 1).min(sessions.len().saturating_sub(1)),
+                KeyCode::Char('d') => {
+                    if let Some(session) = sessions.get(*selected).cloned() {
+                        let label = format!("{} · {} · {} messages", session.title, session.age, session.messages);
+                        // The picker comes back with the list once the deletion is done.
+                        self.sessions_wanted = true;
+                        self.confirm_delete_session(session.id, label);
+                    }
+                }
                 KeyCode::Enter => {
                     let id = sessions.get(*selected).map(|session| session.id.clone());
                     self.overlay = None;
@@ -3346,6 +3603,8 @@ impl App {
                 }
                 _ => {}
             },
+            // Handled above, before the borrow.
+            Overlay::Install(_) | Overlay::SkillSearch { .. } | Overlay::PluginBrowse { .. } => {}
             Overlay::ToolFilter { server, tools, selected } => match key.code {
                 KeyCode::Esc => self.overlay = None,
                 KeyCode::Up => *selected = selected.saturating_sub(1),
@@ -3404,6 +3663,8 @@ impl App {
                         }
                         Confirmed::TrustProject => vec![Action::TrustProject],
                         Confirmed::WriteInit => vec![Action::WriteInit],
+                        Confirmed::ForgetMemory { scope, name } => vec![Action::ForgetMemory { scope, name }],
+                        Confirmed::DeleteSession(id) => vec![Action::DeleteSession(id)],
                     };
                 }
                 KeyCode::Char('n') | KeyCode::Esc => self.overlay = None,
@@ -3592,6 +3853,17 @@ impl App {
                     let path = user_path.clone();
                     self.overlay = None;
                     return vec![Action::EditFile(path)];
+                }
+                KeyCode::Char('d') => {
+                    if let Some((scope, name)) = files.get(*selected).and_then(|file| file.memory.clone()) {
+                        self.overlay = Some(Overlay::Confirm(ConfirmState {
+                            title: format!("Forget \"{name}\"?"),
+                            body: vec![
+                                "re-code stops bringing this up in later sessions; the file is deleted.".to_owned(),
+                            ],
+                            command: Confirmed::ForgetMemory { scope, name },
+                        }));
+                    }
                 }
                 KeyCode::Char('n') => {
                     let Some(project) = project_path.clone() else {
@@ -3862,6 +4134,8 @@ impl App {
                 }
             }
             PaletteCommand::TrustProject => return self.trust_project(),
+            PaletteCommand::InstallSkill => return self.open_install(None),
+            PaletteCommand::InstallPlugin => return self.open_plugin_install(None),
             PaletteCommand::FreeModels => {
                 if self.demo {
                     self.toast("That isn't available in the demo recording.", ToastLevel::Info);
@@ -3954,6 +4228,15 @@ impl App {
             welcome.set_filter(filter, self.welcome_info.as_ref());
         }
     }
+}
+
+/// Who serves a model: its cloud provider, or the local runtime.
+fn provider_of(info: &crate::welcome::WelcomeInfo, model: &str) -> String {
+    info.models
+        .iter()
+        .find(|m| m.name == model)
+        .and_then(|m| m.provider_label.clone())
+        .unwrap_or_else(|| info.provider_name.clone())
 }
 
 #[cfg(test)]

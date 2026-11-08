@@ -174,7 +174,9 @@ async fn play_recording(events: UnboundedSender<UiEvent>, mut commands: Unbounde
                         | UiCommand::Init
                         | UiCommand::WriteInit
                         | UiCommand::ListInstructions
-                        | UiCommand::WriteNote { .. },
+                        | UiCommand::WriteNote { .. }
+                        | UiCommand::ForgetMemory { .. }
+                        | UiCommand::DeleteSession(_),
                     ) => {
                         let _ = events.send(UiEvent::Notice("That isn't available in the demo recording.".to_owned()));
                         Vec::new()
@@ -289,6 +291,10 @@ fn apply_event(app: &mut App, event: UiEvent) {
         UiEvent::RuntimeStart(event) => app.runtime_start_event(event),
         UiEvent::ProjectTrust(trust) => app.project_trust = Some(trust),
         UiEvent::McpSearch { query, hits, error } => app.mcp_search_result(&query, hits, error),
+        UiEvent::Install(outcome) => app.install_outcome(outcome),
+        UiEvent::PluginInstall(outcome) => app.plugin_outcome(outcome),
+        UiEvent::PluginListings { title, listings, error } => app.plugin_listings(&title, listings, error),
+        UiEvent::SkillSearch { query, hits, note, error } => app.skill_search_result(&query, hits, note, error),
         UiEvent::ToolStatus { active, summary } => {
             app.tool_status = Some((active, crate::sanitize::sanitize(&summary)))
         }
@@ -414,6 +420,12 @@ async fn event_loop(terminal: &mut DefaultTerminal, app: &mut App, mut link: Lin
                     // Everything already waiting is applied together, so a fast stream costs one frame.
                     while let Ok(event) = link.events.try_recv() {
                         apply_event(app, event);
+                    }
+                    // An event can call for something of the driver (a staged skill nobody is waiting for is discarded).
+                    for action in std::mem::take(&mut app.pending_actions) {
+                        if perform(action, &link.commands)? {
+                            return Ok(());
+                        }
                     }
                     dirty = true;
                 } else {
@@ -659,6 +671,8 @@ fn perform(action: Action, commands: &UnboundedSender<UiCommand>) -> Result<bool
         Action::WriteInit => UiCommand::WriteInit,
         Action::ListInstructions => UiCommand::ListInstructions,
         Action::WriteNote { scope, text } => UiCommand::WriteNote { scope, text },
+        Action::ForgetMemory { scope, name } => UiCommand::ForgetMemory { scope, name },
+        Action::DeleteSession(id) => UiCommand::DeleteSession(id),
         Action::ShowCompaction(seq) => UiCommand::ShowCompaction(seq),
         Action::NewConversation => UiCommand::NewConversation,
         Action::ContinueLast => UiCommand::ContinueLast,

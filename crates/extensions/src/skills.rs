@@ -14,7 +14,12 @@ const CHARS_PER_TOKEN: u64 = 3;
 
 /// Finds every skill, with re-code's own first. `project_trusted` says whether the project folder's
 /// configuration has been trusted, which is what lets its skills switch on.
-pub(crate) fn discover(locations: &Locations, disabled: &BTreeSet<String>, project_trusted: bool) -> Vec<Skill> {
+pub(crate) fn discover(
+    locations: &Locations,
+    disabled: &BTreeSet<String>,
+    project_trusted: bool,
+    disabled_plugins: &BTreeSet<String>,
+) -> Vec<Skill> {
     let mut skills = Vec::new();
     let roots = [
         (Some(&locations.user_skills), SkillSource::User),
@@ -30,6 +35,15 @@ pub(crate) fn discover(locations: &Locations, disabled: &BTreeSet<String>, proje
             .collect();
         found.sort_by(|a, b| a.name.cmp(&b.name));
         skills.extend(found);
+    }
+    if let Ok(entries) = std::fs::read_dir(&locations.plugins_dir) {
+        let mut plugins: Vec<_> = entries.flatten().filter(|entry| entry.path().is_dir()).collect();
+        plugins.sort_by_key(|entry| entry.file_name());
+        for entry in plugins {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let enabled = !disabled_plugins.contains(&name);
+            skills.extend(crate::plugins::skills_of(&entry.path(), &name, enabled, disabled));
+        }
     }
     skills
 }
@@ -78,6 +92,9 @@ pub fn read_skill(
         .or_else(|| frontmatter::check_name(&skill.name, folder).err());
     skill.scan = scan::scan_dir(directory);
     skill.enabled = skill.trusted && !disabled.contains(&skill.name) && skill.problem.is_none() && !skill.scan.blocks();
+    if source == SkillSource::User {
+        skill.installed_from = crate::skillhub::read_source(directory);
+    }
     Some(skill)
 }
 

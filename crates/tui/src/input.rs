@@ -133,6 +133,23 @@ impl Input {
         self.cursor = start;
     }
 
+    /// Deletes back to the start of the word before the cursor, as Ctrl+Backspace does in editors:
+    /// spaces first, then a run of letters and digits, or a run of punctuation.
+    pub fn delete_word_back(&mut self) {
+        let before = &self.text[..self.cursor];
+        let mut start = before.trim_end().len();
+        let word = |c: char| c.is_alphanumeric() || c == '_';
+        let kind = before[..start].chars().next_back().map(word);
+        for (index, c) in before[..start].char_indices().rev() {
+            if c.is_whitespace() || Some(word(c)) != kind {
+                break;
+            }
+            start = index;
+        }
+        self.text.replace_range(start..self.cursor, "");
+        self.cursor = start;
+    }
+
     /// Moves by visual rows. Returns false if there is no row in that direction.
     pub fn move_vertical(&mut self, width: usize, down: bool) -> bool {
         let rows = self.rows(width);
@@ -191,6 +208,29 @@ impl Input {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ctrl_backspace_takes_one_word_at_a_time() {
+        let mut input = Input::default();
+        input.insert("cargo test --package re-code  ");
+        input.delete_word_back();
+        assert_eq!(input.text(), "cargo test --package re-");
+        input.delete_word_back();
+        assert_eq!(input.text(), "cargo test --package re");
+        input.delete_word_back();
+        assert_eq!(input.text(), "cargo test --package ");
+        input.delete_word_back();
+        assert_eq!(input.text(), "cargo test --");
+        input.delete_word_back();
+        input.delete_word_back();
+        assert_eq!(input.text(), "cargo ");
+        input.delete_word_back();
+        input.delete_word_back();
+        assert_eq!(input.text(), "");
+        input.insert("héllo wörld");
+        input.delete_word_back();
+        assert_eq!(input.text(), "héllo ");
+    }
 
     fn with(text: &str) -> Input {
         let mut input = Input::default();

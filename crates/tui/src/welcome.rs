@@ -31,18 +31,20 @@ pub enum HomeTab {
     Providers,
     Mcp,
     Skills,
+    Plugins,
     Tools,
     Settings,
 }
 
 impl HomeTab {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 9] = [
         Self::Home,
         Self::Models,
         Self::Runtimes,
         Self::Providers,
         Self::Mcp,
         Self::Skills,
+        Self::Plugins,
         Self::Tools,
         Self::Settings,
     ];
@@ -65,6 +67,7 @@ impl HomeTab {
             Self::Providers => "Providers",
             Self::Mcp => "MCP",
             Self::Skills => "Skills",
+            Self::Plugins => "Plugins",
             Self::Tools => "Tools",
         }
     }
@@ -118,6 +121,8 @@ pub struct WelcomeModel {
     pub price: Option<(f64, f64)>,
     /// Bytes of key/value cache per token of context, when the runtime says (local models).
     pub kv_bytes_per_token: Option<u64>,
+    /// What the provider's listing (or the models.dev catalog) says about it beyond the basics.
+    pub details: recode_core::model_facts::ModelFacts,
 }
 
 /// Whether a runtime can be used.
@@ -204,6 +209,15 @@ impl Group {
     }
 }
 
+/// The heading a model is listed under: its group, or its provider when sorted by provider.
+fn heading_of(model: &WelcomeModel, by_provider: bool) -> String {
+    match (&model.provider_label, by_provider) {
+        (Some(label), true) => label.clone(),
+        (None, true) => Group::Local.label().to_owned(),
+        (_, false) => Group::of(model).label().to_owned(),
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct WelcomeState {
     pub filter: String,
@@ -212,8 +226,10 @@ pub struct WelcomeState {
     pub selected: usize,
     pub tab: HomeTab,
     /// Selected row in the MCP, Skills and Tools tabs.
-    extension_rows: [usize; 7],
+    extension_rows: [usize; 8],
     opened: Instant,
+    /// Models listed under their provider (Ctrl+P) instead of local, free, paid.
+    pub by_provider: bool,
 }
 
 impl WelcomeState {
@@ -224,8 +240,9 @@ impl WelcomeState {
             only: Only::default(),
             selected: 0,
             tab: HomeTab::Models,
-            extension_rows: [0; 7],
+            extension_rows: [0; 8],
             opened: now,
+            by_provider: false,
         }
     }
 
@@ -243,6 +260,7 @@ impl WelcomeState {
             HomeTab::Home => 4,
             HomeTab::Settings => 5,
             HomeTab::Runtimes => 6,
+            HomeTab::Plugins => 7,
         }
     }
 
@@ -282,8 +300,16 @@ impl WelcomeState {
             })
             .map(|(index, _)| index)
             .collect();
-        // Grouped: local, free, paid, then those that need a key. Stable within a group.
-        matches.sort_by_key(|index| Group::of(&info.models[*index]));
+        // Grouped: local, free, paid, then those that need a key; or local first, then by provider.
+        // Stable within a group either way.
+        if self.by_provider {
+            matches.sort_by_cached_key(|index| {
+                let model = &info.models[*index];
+                (model.provider_label.is_some(), heading_of(model, true).to_lowercase(), Group::of(model))
+            });
+        } else {
+            matches.sort_by_key(|index| Group::of(&info.models[*index]));
+        }
         matches
     }
 
@@ -382,6 +408,7 @@ fn tab_count(app: &App, tab: HomeTab) -> Option<usize> {
         HomeTab::Providers => extensions.map(|e| e.providers.len()),
         HomeTab::Mcp => extensions.map(|e| e.servers.len()),
         HomeTab::Skills => extensions.map(|e| e.skills.len()),
+        HomeTab::Plugins => extensions.map(|e| e.plugins.len()),
         HomeTab::Tools => extensions.map(|e| e.tools.len()),
     }
 }
@@ -449,7 +476,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
         items.push(("^C", "again to exit"));
     }
     match tab {
-        HomeTab::Home => items.extend([("enter", "open"), ("↑↓", "choose")]),
+        HomeTab::Home => items.extend([("enter", "open"), ("↑↓", "choose"), ("d", "delete chat")]),
         HomeTab::Runtimes => items.extend([("enter", "start"), ("↑↓", "choose")]),
         HomeTab::Settings => {
             items.extend([("enter", "change"), ("←→", "adjust"), ("↑↓", "choose"), ("d", "remove key")])
@@ -458,7 +485,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
             if app.welcome_info.as_ref().is_some_and(|info| !info.models.is_empty()) {
                 items.push(("enter", "start"));
                 items.push(("↑↓", "choose"));
-                items.push(("type", "to filter"));
+                // The filter row says "type to filter" itself.
                 let only = match &app.screen {
                     Screen::Welcome(welcome) => welcome.only,
                     Screen::Conversation => Only::default(),
@@ -466,6 +493,8 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 items.push(("^F", if only.free { "free ●" } else { "free ○" }));
                 items.push(("^T", if only.tools { "tools ●" } else { "tools ○" }));
                 items.push(("^V", if only.vision { "vision ●" } else { "vision ○" }));
+                let by_provider = matches!(&app.screen, Screen::Welcome(welcome) if welcome.by_provider);
+                items.push(("^P", if by_provider { "provider ●" } else { "provider ○" }));
                 items.push(("k", "key"));
             }
         }
@@ -493,7 +522,29 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 ("d", "delete"),
             ]);
         }
-        HomeTab::Skills | HomeTab::Tools => {
+        HomeTab::Skills => {
+            items.extend([
+                ("a", "add"),
+                ("i", "install"),
+                ("e", "edit"),
+                ("space", "on/off"),
+                ("d", "delete"),
+                ("s", "search"),
+                ("u", "update"),
+            ]);
+        }
+        HomeTab::Plugins => {
+            items.extend([
+                ("i", "install"),
+                ("b", "browse"),
+                ("s", "search"),
+                ("m", "marketplace"),
+                ("space", "on/off"),
+                ("u", "update"),
+                ("d", "remove"),
+            ]);
+        }
+        HomeTab::Tools => {
             items.extend([("a", "add"), ("e", "edit"), ("space", "on/off"), ("d", "delete")]);
         }
     }
@@ -587,6 +638,7 @@ pub fn draw(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
             HomeTab::Providers => app.extensions.as_ref().map_or(0, |e| e.providers.len()),
             HomeTab::Mcp => app.extensions.as_ref().map_or(0, |e| e.servers.len()),
             HomeTab::Skills => app.extensions.as_ref().map_or(0, |e| e.skills.len()),
+            HomeTab::Plugins => app.extensions.as_ref().map_or(0, |e| extensions_view::plugin_rows(e).len()),
             _ => app.extensions.as_ref().map_or(0, |e| e.tools.len()),
         };
         extensions_view::draw(frame, inner, app, welcome.tab, welcome.extension_index(count));
@@ -627,6 +679,7 @@ fn body_title(welcome: &WelcomeState, info: Option<&WelcomeInfo>) -> String {
         HomeTab::Providers => " Model providers ".to_owned(),
         HomeTab::Mcp => " MCP servers ".to_owned(),
         HomeTab::Skills => " Skills ".to_owned(),
+        HomeTab::Plugins => " Plugins and marketplaces ".to_owned(),
         HomeTab::Tools => " Custom tools ".to_owned(),
     }
 }
@@ -736,16 +789,17 @@ fn draw_list(frame: &mut Frame<'_>, area: Rect, welcome: &WelcomeState, info: &W
         return rows;
     }
     // Group headings only when there's room for them, and only when there's more than one group.
-    let groups: std::collections::BTreeSet<Group> =
-        matches.iter().map(|index| Group::of(&info.models[*index])).collect();
+    let by_provider = welcome.by_provider;
+    let groups: std::collections::BTreeSet<String> =
+        matches.iter().map(|index| heading_of(&info.models[*index], by_provider)).collect();
     let with_headings = rows >= 6 && groups.len() > 1;
     let mut list: Vec<ListRow> = Vec::new();
-    let mut current_group = None;
+    let mut current_group: Option<String> = None;
     for index in &matches {
-        let group = Group::of(&info.models[*index]);
-        if with_headings && current_group != Some(group) {
-            let count = matches.iter().filter(|other| Group::of(&info.models[**other]) == group).count();
-            list.push(ListRow::Heading(group, count));
+        let group = heading_of(&info.models[*index], by_provider);
+        if with_headings && current_group.as_ref() != Some(&group) {
+            let count = matches.iter().filter(|other| heading_of(&info.models[**other], by_provider) == group).count();
+            list.push(ListRow::Heading(group.clone(), count));
             current_group = Some(group);
         }
         list.push(ListRow::Model(*index));
@@ -759,7 +813,7 @@ fn draw_list(frame: &mut Frame<'_>, area: Rect, welcome: &WelcomeState, info: &W
         let rect = Rect::new(area.x, row_y, area.width, 1);
         match row {
             ListRow::Heading(group, count) => {
-                let text = format!("{} · {count}", group.label());
+                let text = format!("{group} · {count}");
                 let text = truncate(&text, width.saturating_sub(4));
                 let fill = width.saturating_sub(text.width() + 4);
                 let line = Line::from(vec![
@@ -782,7 +836,7 @@ fn draw_list(frame: &mut Frame<'_>, area: Rect, welcome: &WelcomeState, info: &W
 
 /// A row of the model list: a model, or the heading of the group that follows.
 enum ListRow {
-    Heading(Group, usize),
+    Heading(String, usize),
     Model(usize),
 }
 
@@ -825,7 +879,16 @@ fn model_row(model: &WelcomeModel, selected: bool, width: usize, current: bool) 
     } else {
         fit_marker(model.fit)
     };
-    let dim = if model.needs_key { theme::muted().patch(base) } else { dim };
+    // Cloud models read by price at a glance: free in green, paid in the theme's accent.
+    let dim = if model.needs_key {
+        theme::muted().patch(base)
+    } else if model.provider_label.is_some() && model.free {
+        Style::new().fg(color(Token::Success)).patch(base)
+    } else if model.provider_label.is_some() {
+        theme::accent().patch(base)
+    } else {
+        dim
+    };
     let room = width.saturating_sub(4);
     let columns = columns_for(room);
     let size = match (&model.provider_label, model.size_gib) {
@@ -866,6 +929,23 @@ fn draw_details(frame: &mut Frame<'_>, area: Rect, model: &WelcomeModel, free_vr
     if !facts.is_empty() {
         lines.extend(wrap_plain(&facts.join(" · "), theme::muted(), width));
     }
+    // What the provider says about it, cut to a few lines: listings are written by the provider.
+    let about = &model.details;
+    if let Some(display) = about.display_name.as_ref().filter(|display| **display != model.name) {
+        lines.extend(wrap_plain(&crate::sanitize::sanitize(display), theme::muted(), width));
+    }
+    if let Some(description) = &about.description {
+        let mut text = wrap_plain(&crate::sanitize::sanitize(description), Style::new(), width);
+        if text.len() > 5 {
+            text.truncate(5);
+            if let Some(last) = text.last_mut() {
+                let shown: String = last.spans.iter().map(|span| span.content.as_ref()).collect();
+                *last = Line::raw(format!("{}…", truncate(&shown, width.saturating_sub(1))));
+            }
+        }
+        lines.push(Line::default());
+        lines.extend(text);
+    }
     lines.push(Line::default());
 
     let mut chips = Vec::new();
@@ -882,8 +962,9 @@ fn draw_details(frame: &mut Frame<'_>, area: Rect, model: &WelcomeModel, free_vr
     if model.free {
         lines.push(Line::from(chip("free", color(Token::Success))));
     } else if let Some((input, output)) = model.price {
-        let text = format!("${input:.2} in · ${output:.2} out, per million tokens");
-        lines.extend(wrap_plain(&text, theme::muted(), width));
+        let cached = about.cached_price.map(|cached| format!(" · ${cached:.2} cached in")).unwrap_or_default();
+        let text = format!("${input:.2} in · ${output:.2} out{cached}, per million tokens");
+        lines.extend(wrap_plain(&text, theme::accent(), width));
     }
     if model.needs_key {
         let who = model.provider_label.as_deref().unwrap_or("this provider");
@@ -918,7 +999,33 @@ fn draw_details(frame: &mut Frame<'_>, area: Rect, model: &WelcomeModel, free_vr
     lines.extend(wrap_plain(&fit_sentence(model.fit), Style::new(), width));
     lines.push(Line::default());
     if let Some(limit) = model.context_limit {
-        lines.extend(wrap_plain(&format!("Context limit: {limit} tokens"), theme::muted(), width));
+        let replies = about.max_output.map(|max| format!(", replies up to {max}")).unwrap_or_default();
+        lines.extend(wrap_plain(&format!("Context limit: {limit} tokens{replies}"), theme::muted(), width));
+    }
+    if let Some(modalities) = &about.modalities {
+        lines.extend(wrap_plain(&format!("Takes {modalities}"), theme::muted(), width));
+    }
+    if let Some(hosts) = &about.hosts {
+        lines.extend(wrap_plain(&format!("Served by {}", crate::sanitize::sanitize(hosts)), theme::muted(), width));
+    }
+    let dates: Vec<String> = [
+        about.released.as_ref().map(|date| format!("released {date}")),
+        about.knowledge.as_ref().map(|date| format!("knowledge to {date}")),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    if !dates.is_empty() {
+        let text = dates.join(" · ");
+        let text = format!("{}{}", text[..1].to_uppercase(), &text[1..]);
+        lines.extend(wrap_plain(&text, theme::muted(), width));
+    }
+    if let Some(retires) = &about.retires {
+        lines.extend(wrap_plain(
+            &format!("The provider stops serving it on {retires}."),
+            Style::new().fg(color(Token::Attention)),
+            width,
+        ));
     }
     if let Some(bytes) = model.kv_bytes_per_token {
         #[allow(clippy::cast_precision_loss)]
@@ -943,6 +1050,50 @@ fn draw_details(frame: &mut Frame<'_>, area: Rect, model: &WelcomeModel, free_vr
 mod tests {
     use super::*;
 
+    #[test]
+    fn sorting_by_provider_lists_local_first_then_each_provider() {
+        let model = |name: &str, provider: Option<&str>, free: bool| WelcomeModel {
+            name: name.to_owned(),
+            size_gib: None,
+            family: None,
+            parameters: None,
+            quantization: None,
+            context_limit: None,
+            tools: true,
+            vision: false,
+            thinking: false,
+            fit: GpuFit::Cloud,
+            loaded: false,
+            provider_label: provider.map(str::to_owned),
+            free,
+            needs_key: false,
+            price: None,
+            kv_bytes_per_token: None,
+            details: recode_core::model_facts::ModelFacts::default(),
+        };
+        let info = WelcomeInfo {
+            models: vec![
+                model("zen-free", Some("opencode-zen"), true),
+                model("local", None, false),
+                model("or-paid", Some("openrouter"), false),
+                model("anthropic-paid", Some("anthropic"), false),
+                model("or-free", Some("openrouter"), true),
+            ],
+            provider_name: "Ollama".to_owned(),
+            provider: ProviderState::Ready { detail: String::new() },
+            hardware: Vec::new(),
+            free_vram_gib: None,
+            last_model: None,
+        };
+        let mut state = WelcomeState::new(Instant::now());
+        let names = |state: &WelcomeState| -> Vec<String> {
+            state.matches(&info).into_iter().map(|i| info.models[i].name.clone()).collect()
+        };
+        assert_eq!(names(&state), ["local", "zen-free", "or-free", "or-paid", "anthropic-paid"]);
+        state.by_provider = true;
+        assert_eq!(names(&state), ["local", "anthropic-paid", "zen-free", "or-free", "or-paid"]);
+    }
+
     fn model(name: &str, size: f64, fit: GpuFit, tools: bool) -> WelcomeModel {
         WelcomeModel {
             name: name.to_owned(),
@@ -961,6 +1112,7 @@ mod tests {
             needs_key: false,
             price: None,
             kv_bytes_per_token: None,
+            details: recode_core::model_facts::ModelFacts::default(),
         }
     }
 

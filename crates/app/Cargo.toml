@@ -42,3 +42,40 @@ wiremock.workspace = true
 
 [lints]
 workspace = true
+
+# Fedora package: `cargo generate-rpm -p crates/app` after `cargo build --release` (scripts/package.sh).
+[package.metadata.generate-rpm]
+summary = "A terminal-native AI coding agent for your own machine"
+license = "Apache-2.0"
+url = "https://github.com/ZeroDay-Labz/Re-Code"
+assets = [
+    { source = "target/release/re-code", dest = "/usr/bin/re-code", mode = "755" },
+    { source = "LICENSE", dest = "/usr/share/licenses/re-code/LICENSE", mode = "644", doc = true },
+    { source = "NOTICE", dest = "/usr/share/licenses/re-code/NOTICE", mode = "644", doc = true },
+    { source = "README.md", dest = "/usr/share/doc/re-code/README.md", mode = "644", doc = true },
+    { source = "assets/icon/re-code.svg", dest = "/usr/share/icons/hicolor/scalable/apps/re-code.svg", mode = "644" },
+]
+# bubblewrap sandboxes commands, podman/git are used when present; none is required to start.
+[package.metadata.generate-rpm.recommends]
+bubblewrap = "*"
+git = "*"
+
+# Debian/Ubuntu package: `cargo deb -p re-code` (scripts/package.sh).
+[package.metadata.deb]
+name = "re-code"
+maintainer = "ZeroDay-Labz <https://github.com/ZeroDay-Labz>"
+copyright = "ZeroDay-Labz"
+license-file = ["../../LICENSE", "0"]
+extended-description = """A terminal-native AI coding agent for Linux, local models first.
+Reads, searches, edits and writes files with your approval, runs commands in a
+bubblewrap sandbox, and uses your MCP servers, skills and plugins."""
+section = "devel"
+priority = "optional"
+depends = "libc6"
+recommends = "bubblewrap, git"
+assets = [
+    ["target/release/re-code", "usr/bin/", "755"],
+    ["../../README.md", "usr/share/doc/re-code/README.md", "644"],
+    ["../../NOTICE", "usr/share/doc/re-code/NOTICE", "644"],
+    ["../../assets/icon/re-code.svg", "usr/share/icons/hicolor/scalable/apps/re-code.svg", "644"],
+]

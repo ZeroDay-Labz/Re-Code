@@ -133,9 +133,15 @@ pub async fn identify(url: &str) -> Outcome {
     {
         return Outcome::Identified { kind: RuntimeKind::Vllm, version: Some(version.to_owned()) };
     }
-    // Anything speaking the OpenAI models API.
+    // Anything speaking the OpenAI models API, unless its own API description says it can't chat: a
+    // speech server such as Kokoro lists `tts-1` under /v1/models too.
     match get(&client, url, "/v1/models").await {
         Answer::Json(value) if value.get("data").is_some_and(serde_json::Value::is_array) => {
+            if let Answer::Json(spec) = get(&client, url, "/openapi.json").await
+                && let Some(summary) = not_a_chat_server(&spec)
+            {
+                return Outcome::Unidentified { summary };
+            }
             return Outcome::Identified { kind: RuntimeKind::OpenAiCompatible, version: None };
         }
         Answer::Json(_) | Answer::Text(_) | Answer::Other { .. } => {
@@ -149,6 +155,27 @@ pub async fn identify(url: &str) -> Outcome {
         }
         None => Outcome::Silent,
     }
+}
+
+/// When an OpenAPI description lists endpoints but none to chat or complete text with, what the server
+/// is instead, in a line.
+fn not_a_chat_server(spec: &serde_json::Value) -> Option<String> {
+    let paths = spec.get("paths")?.as_object()?;
+    if paths.is_empty()
+        || paths.keys().any(|path| path.ends_with("/chat/completions") || path.ends_with("/completions"))
+    {
+        return None;
+    }
+    let info = spec.get("info");
+    let field = |key: &str| info.and_then(|i| i.get(key)).and_then(|v| v.as_str()).unwrap_or_default();
+    let name = match (field("title"), field("version")) {
+        ("", _) => "A server".to_owned(),
+        (title, "") => title.to_owned(),
+        (title, version) => format!("{title} {version}"),
+    };
+    let speech = paths.keys().any(|path| path.contains("/audio/"));
+    let what = if speech { "a speech server" } else { "another kind of service" };
+    Some(format!("{name}: {what} with no chat endpoint, so not a model runtime re-code can use"))
 }
 
 #[cfg(test)]
@@ -181,6 +208,37 @@ mod tests {
         }
         Mock::given(method("GET")).respond_with(ResponseTemplate::new(404)).mount(&server).await;
         server
+    }
+
+    /// Kokoro-FastAPI, as it answered on a user's machine: OpenAI's models API, but speech only.
+    #[tokio::test]
+    async fn a_speech_server_with_a_models_list_is_not_taken_for_a_chat_runtime() {
+        let kokoro = server_with(&[
+            ("/v1/models", serde_json::json!({"object": "list", "data": [{"id": "tts-1", "owned_by": "kokoro"}]})),
+            (
+                "/openapi.json",
+                serde_json::json!({"info": {"title": "Kokoro TTS API", "version": "0.9.0"},
+                                   "paths": {"/v1/audio/speech": {}, "/v1/audio/voices": {}, "/v1/models": {}, "/health": {}}}),
+            ),
+        ])
+        .await;
+        assert_eq!(
+            identify(&kokoro.uri()).await,
+            Outcome::Unidentified {
+                summary: "Kokoro TTS API 0.9.0: a speech server with no chat endpoint, so not a model runtime re-code can use"
+                    .into()
+            }
+        );
+        // A chat server that describes itself stays a runtime.
+        let chat = server_with(&[
+            ("/v1/models", serde_json::json!({"data": [{"id": "m"}]})),
+            ("/openapi.json", serde_json::json!({"paths": {"/v1/chat/completions": {}, "/v1/models": {}}})),
+        ])
+        .await;
+        assert_eq!(
+            identify(&chat.uri()).await,
+            Outcome::Identified { kind: RuntimeKind::OpenAiCompatible, version: None }
+        );
     }
 
     #[tokio::test]
