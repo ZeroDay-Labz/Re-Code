@@ -5,6 +5,17 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-08
+
+### Added
+
+- The skill search window is now a browser of the whole Hermes index: it lists at once, narrows live as
+  you type, and `←`/`→` step through its sources (Hermes' own skills first, then ClawHub, skills.sh,
+  GitHub, LobeHub) with each one's count. Hermes' own skills show their category, and words match
+  categories and tags as well as names and descriptions. The header says how many matched past the
+  page shown. `/skill browse [source]` opens within one source; `re-code skill browse [--source X]
+  [words]` does the same from the shell.
+
 ### Fixed
 
 - Piping the command line's output into `head` wrote a crash file ("failed printing to stdout: Broken

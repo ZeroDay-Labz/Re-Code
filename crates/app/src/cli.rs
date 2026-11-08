@@ -106,6 +106,17 @@ pub enum SkillAction {
     Search {
         query: Vec<String>,
     },
+    /// List the Hermes index, or one of its sources (official, github, skills.sh, clawhub, lobehub),
+    /// narrowed by words.
+    Browse {
+        /// Stay within one source; leave out for all of them.
+        #[arg(long)]
+        source: Option<String>,
+        /// How many to show.
+        #[arg(long, default_value_t = 40)]
+        limit: usize,
+        query: Vec<String>,
+    },
     /// Install from the Hermes index (official/…, a name), owner/repo/folder, a GitHub or skills.sh
     /// link, a SKILL.md link or a folder. Nothing fetched is run.
     Install(InstallArgs),
@@ -453,6 +464,23 @@ async fn skill(session: &mut Session, action: SkillAction) -> Result<i32, String
             }
             for hit in search.hits {
                 println!("{:<32} [{}]  {}", hit.tap, hit.label, hit.description);
+            }
+            Ok(OK)
+        }
+        SkillAction::Browse { source, limit, query } => {
+            let hub = session.skill_hub()?;
+            let page = hub.browse(source.as_deref(), &query.join(" "), limit).await?;
+            if let Some(note) = page.note {
+                eprintln!("{note}");
+            }
+            let sources: Vec<String> = page.sources.iter().map(|(name, n)| format!("{name} {n}")).collect();
+            println!("sources: {}", sources.join(" · "));
+            for hit in &page.hits {
+                let category = hit.category.as_deref().map(|c| format!(" {c}")).unwrap_or_default();
+                println!("{:<44} [{}{category}]  {}", hit.tap, hit.label, hit.description);
+            }
+            if page.hits.len() < page.total {
+                println!("… {} of {} shown; add words to narrow, or --limit.", page.hits.len(), page.total);
             }
             Ok(OK)
         }

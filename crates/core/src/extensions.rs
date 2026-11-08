@@ -872,6 +872,9 @@ pub struct SkillSearchHit {
     pub label: String,
     pub repo: String,
     pub path: String,
+    /// For Hermes' own skills, the folder they're filed under (security, documents, …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
 }
 
 /// One tool offered by an MCP server.
@@ -1021,8 +1024,12 @@ pub enum ExtensionCommand {
     DiscardInstall(String),
     /// Stage the newest version of an installed skill, showing what would change.
     UpdateSkill(String),
-    /// Search the skill hubs.
-    SearchSkills(String),
+    /// Browse the Hermes skills index: a source to stay within (`official`, `github`, `clawhub`, …, or
+    /// none for all of them) and words to narrow by (empty lists the source). Answered live as typed.
+    BrowseSkills {
+        source: Option<String>,
+        query: String,
+    },
     /// Stage several skills at once (pasted links, ticked search hits); the answer is one `InstallBatch`.
     StageSkillBatch(Vec<String>),
     /// Stage a skill from pasted `SKILL.md` text.

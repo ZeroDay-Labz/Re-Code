@@ -13,19 +13,19 @@ expression: "screen(&draw(app, width, height))"
   │❯ ● review                                                    yours │ review                                      │
   │  ○ from-repo                                               project │ Use this when something needs doing,        │
   │  ● borrowed                                            claude code │ described at reasonable length.             │
-  │  ✗ damaged                                                   yours │                                             │
-  │            ╭ Search skill hubs ─────────────────────────────────────────────────────────────────────╮            │
-  │            │ Search  pdf▏                                                                           │stimated).  │
-  │            │                                                                                        │ills/review/│
-  │            │ ❯ [ ] pdf   community                                                                  │            │
-  │            │         Work with PDF files.  ·  anthropics/skills/skills/pdf                          │            │
-  │            │   [ ] pdf-forms   official                                                             │hen you're  │
-  │            │         Fill PDF forms from structured data.  ·  NousResearch/hermes-agent/optional-s… │th Ctrl+L.  │
-  │            │                                                                                        │            │
-  │            │ enter install  tab tick  ^a all  ↑↓ choose  esc cancel                                 │            │
-  │            │                                                                                        │            │
-  │            │                                                                                        │            │
-  │            ╰────────────────────────────────────────────────────────────────────────────────────────╯            │
+  │  ✗ damag╭ Browse skills ───────────────────────────────────────────────────────────────────────────────╮         │
+  │         │ Filter  pdf▏   2 of 1 234                                                                    │         │
+  │         │ Source  all 102 402 · official 141 · clawhub 82 671 · skills.sh 18 439 · github 1 151        │mated).  │
+  │         │                                                                                              │s/review/│
+  │         │ ❯ [ ] pdf   community                                                                        │         │
+  │         │         Work with PDF files.  ·  anthropics/skills/skills/pdf                                │         │
+  │         │   [ ] pdf-forms   official   documents                                                       │ you're  │
+  │         │         Fill PDF forms from structured data.  ·  NousResearch/hermes-agent/optional-skills/… │Ctrl+L.  │
+  │         │                                                                                              │         │
+  │         │ enter install  tab tick  ^a all shown  ←→ source  esc cancel                                 │         │
+  │         │                                                                                              │         │
+  │         │                                                                                              │         │
+  │         ╰──────────────────────────────────────────────────────────────────────────────────────────────╯         │
   │                                                                    │                                             │
   │                                                                    │                                             │
   │                                                                    │                                             │
@@ -35,4 +35,4 @@ expression: "screen(&draw(app, width, height))"
   ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
   GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
   Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
-           a add  i install  e edit  space on/off  d delete  s search  u update  tab next  ^R rescan  ^C quit
+           a add  i install  e edit  space on/off  d delete  s browse  u update  tab next  ^R rescan  ^C quit

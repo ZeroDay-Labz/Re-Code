@@ -275,7 +275,8 @@ pub enum Overlay {
         /// Only this category is shown (←/→ cycle through the ones present).
         category: Option<String>,
     },
-    /// Searching the skill hubs: type, Enter searches, Enter on a hit fetches it.
+    /// Browsing the Hermes skills index: typing narrows it live, ←/→ step through its sources, Enter
+    /// on a hit fetches it.
     SkillSearch {
         query: String,
         hits: Vec<recode_core::extensions::SkillSearchHit>,
@@ -285,6 +286,12 @@ pub enum Overlay {
         note: Option<String>,
         /// Taps ticked for a batch install (Tab ticks, Ctrl+A ticks all).
         ticked: std::collections::BTreeSet<String>,
+        /// The source shown (`official`, `github`, `clawhub`, …), or every one.
+        source: Option<String>,
+        /// Each source with how many skills it lists, once the index has answered.
+        sources: Vec<(String, usize)>,
+        /// How many skills matched in all; the hits are the first page of them.
+        total: usize,
     },
     /// Choosing which of a server's tools the model may use.
     ToolFilter {
@@ -1997,7 +2004,8 @@ impl App {
                 let rest = words.next().map(|rest| rest.trim().to_owned()).filter(|rest| !rest.is_empty());
                 match verb {
                     "" | "install" | "add" | "i" => self.open_install(rest),
-                    "search" | "find" | "s" => self.open_skill_search(rest),
+                    "search" | "find" | "s" => self.open_skill_search(rest, None),
+                    "browse" | "b" => self.open_skill_search(None, rest),
                     "update" | "u" => self.update_skill(rest.as_deref().unwrap_or_default()),
                     other => {
                         self.open_install(Some(format!("{other}{}", rest.map(|r| format!(" {r}")).unwrap_or_default())))
@@ -2731,7 +2739,9 @@ impl App {
                 return vec![Action::Extension(ExtensionCommand::ImportOpenCode)];
             }
             KeyCode::Char('i') if tab == HomeTab::Skills => return self.open_install(None),
-            KeyCode::Char('s') if tab == HomeTab::Skills => return self.open_skill_search(None),
+            KeyCode::Char('s') | KeyCode::Char('b') if tab == HomeTab::Skills => {
+                return self.open_skill_search(None, None);
+            }
             KeyCode::Char('u') if tab == HomeTab::Skills => return self.update_selected_skill(),
             KeyCode::Char('i') if tab == HomeTab::Plugins => return self.open_plugin_install(None),
             KeyCode::Char('m') if tab == HomeTab::Plugins => return self.open_marketplace_add(),

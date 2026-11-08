@@ -308,7 +308,7 @@ impl Manager {
             | ExtensionCommand::CommitInstall { .. }
             | ExtensionCommand::DiscardInstall(_)
             | ExtensionCommand::UpdateSkill(_)
-            | ExtensionCommand::SearchSkills(_)
+            | ExtensionCommand::BrowseSkills { .. }
             | ExtensionCommand::StagePlugin(_)
             | ExtensionCommand::StageSkillBatch(_)
             | ExtensionCommand::StageSkillText(_)
@@ -1770,22 +1770,41 @@ async fn drive(
                     }
                 }
             }
-            UiCommand::Extension(ExtensionCommand::SearchSkills(query)) => {
+            UiCommand::Extension(ExtensionCommand::BrowseSkills { source, query }) => {
                 let sink = events.clone();
                 match skill_hub.clone() {
                     Some(hub) => {
                         tokio::spawn(async move {
-                            let (hits, note, error) = match hub.search(&query, 25).await {
-                                Ok(search) => (search.hits, search.note, None),
-                                Err(error) => (Vec::new(), None, Some(error)),
+                            let event = match hub.browse(source.as_deref(), &query, 40).await {
+                                Ok(page) => UiEvent::SkillSearch {
+                                    source,
+                                    query,
+                                    hits: page.hits,
+                                    total: page.total,
+                                    sources: page.sources,
+                                    note: page.note,
+                                    error: None,
+                                },
+                                Err(error) => UiEvent::SkillSearch {
+                                    source,
+                                    query,
+                                    hits: Vec::new(),
+                                    total: 0,
+                                    sources: Vec::new(),
+                                    note: None,
+                                    error: Some(error),
+                                },
                             };
-                            let _ = sink.send(UiEvent::SkillSearch { query, hits, note, error });
+                            let _ = sink.send(event);
                         });
                     }
                     None => {
                         let _ = sink.send(UiEvent::SkillSearch {
+                            source,
                             query,
                             hits: Vec::new(),
+                            total: 0,
+                            sources: Vec::new(),
                             note: None,
                             error: Some(HUB_UNAVAILABLE.to_owned()),
                         });

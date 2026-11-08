@@ -21,4 +21,4 @@ expression: "screen(&draw(app, width, height))"
 ╰──────────────────────────────────────────────────────────╯
  │                                                        │
  ╰────────────────────────────────────────────────────────╯
- a add  i install  e edit  space on/off  d delete  s search
+ a add  i install  e edit  space on/off  d delete  s browse

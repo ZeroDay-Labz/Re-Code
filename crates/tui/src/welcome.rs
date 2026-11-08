@@ -533,7 +533,7 @@ fn home_legend(app: &App, tab: HomeTab) -> Vec<(&'static str, &'static str)> {
                 ("e", "edit"),
                 ("space", "on/off"),
                 ("d", "delete"),
-                ("s", "search"),
+                ("s", "browse"),
                 ("u", "update"),
             ]);
         }

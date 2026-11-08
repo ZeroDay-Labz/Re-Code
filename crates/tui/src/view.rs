@@ -996,7 +996,7 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
                 category.as_deref(),
             );
         }
-        Overlay::SkillSearch { query, hits, selected, searching, error, note, ticked } => {
+        Overlay::SkillSearch { query, hits, selected, searching, error, note, ticked, source, sources, total } => {
             let view = crate::install_view::SearchView {
                 query: &query,
                 hits: &hits,
@@ -1005,6 +1005,9 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
                 error: error.as_deref(),
                 note: note.as_deref(),
                 ticked: &ticked,
+                source: source.as_deref(),
+                sources: &sources,
+                total,
             };
             crate::install_view::draw_skill_search(frame, area, &view);
         }

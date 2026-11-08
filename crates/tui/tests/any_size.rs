@@ -1921,13 +1921,21 @@ fn install_batch() -> App {
 /// The hub search with results.
 fn skill_search() -> App {
     use recode_core::extensions::SkillSearchHit;
+    use recode_tui::install_view::BrowsePage;
     let mut app = home_on(HomeTab::Skills, sample_extensions());
-    app.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    // `s` opens the browser and asks for the whole index at once.
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::BrowseSkills { source: None, query })] if query.is_empty())
+    );
+    // Each typed character asks again, live.
+    let mut last = Vec::new();
     for c in "pdf".chars() {
-        app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+        last = app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
     }
-    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
-    assert!(matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::SearchSkills(q))] if q == "pdf"));
+    assert!(
+        matches!(last.as_slice(), [Action::Extension(ExtensionCommand::BrowseSkills { source: None, query })] if query == "pdf")
+    );
     let hits = vec![
         SkillSearchHit {
             tap: "hermes/github/anthropics/skills/pdf".to_owned(),
@@ -1936,6 +1944,7 @@ fn skill_search() -> App {
             label: "community".to_owned(),
             repo: "anthropics/skills".to_owned(),
             path: "skills/pdf".to_owned(),
+            category: None,
         },
         SkillSearchHit {
             tap: "hermes/official/documents/pdf-forms".to_owned(),
@@ -1944,9 +1953,33 @@ fn skill_search() -> App {
             label: "official".to_owned(),
             repo: "NousResearch/hermes-agent".to_owned(),
             path: "optional-skills/documents/pdf-forms".to_owned(),
+            category: Some("documents".to_owned()),
         },
     ];
-    app.skill_search_result("pdf", hits, None, None);
+    // An answer to an older question (the empty query) is dropped; the one for "pdf" lands.
+    app.skill_search_result(BrowsePage {
+        source: None,
+        query: String::new(),
+        hits: Vec::new(),
+        total: 0,
+        sources: Vec::new(),
+        note: None,
+        error: Some("stale".to_owned()),
+    });
+    app.skill_search_result(BrowsePage {
+        source: None,
+        query: "pdf".to_owned(),
+        hits,
+        total: 1_234,
+        sources: vec![
+            ("official".to_owned(), 141),
+            ("clawhub".to_owned(), 82_671),
+            ("skills.sh".to_owned(), 18_439),
+            ("github".to_owned(), 1_151),
+        ],
+        note: None,
+        error: None,
+    });
     app
 }
 
@@ -2097,7 +2130,40 @@ fn installing_a_skill_shows_the_preview_and_takes_the_decision() {
         "{actions:?}"
     );
 
-    // A search hit installs; a failure is shown; closing the window while fetching discards what arrives.
+    // The browser shows the sources with counts, the page count, and the category of Hermes' own skills;
+    // → steps into the first source (official) and asks the index again within it.
+    let mut app = skill_search();
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(
+        text.contains("Source  all 102\u{2009}402 · official 141 · clawhub 82\u{2009}671")
+            && text.contains("2 of 1\u{2009}234")
+            && text.contains("documents")
+            && !text.contains("stale"),
+        "{text}"
+    );
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::BrowseSkills { source: Some(s), query })] if s == "official" && query == "pdf"),
+        "{actions:?}"
+    );
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("Hermes' own skills") && text.contains("Looking…"), "{text}");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::BrowseSkills { source: None, .. })]),
+        "{actions:?}"
+    );
+
+    // /skill browse clawhub opens within that source.
+    let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
+    app.input.insert("/skill browse clawhub");
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::Extension(ExtensionCommand::BrowseSkills { source: Some(s), query })] if s == "clawhub" && query.is_empty()),
+        "{actions:?}"
+    );
+
+    // A hit installs; a failure is shown; closing the window while fetching discards what arrives.
     let mut app = skill_search();
     let text = screen(&draw(&mut app, 120, 36));
     assert!(

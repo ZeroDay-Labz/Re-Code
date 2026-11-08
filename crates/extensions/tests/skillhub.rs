@@ -396,6 +396,22 @@ async fn the_hermes_index_is_cached_and_searched_and_a_name_resolves_to_its_repo
     let search = hub.search("security", 10).await.unwrap();
     assert_eq!(search.hits[0].name, "godmode");
 
+    // Browsing: every source with its count, official first; an empty query lists a source; words
+    // narrow it; the total counts past the page; Hermes' own skills carry their category.
+    let page = hub.browse(None, "", 10).await.unwrap();
+    assert_eq!(page.sources, [("official".to_owned(), 1), ("community".to_owned(), 2)]);
+    assert_eq!(page.total, 3);
+    assert_eq!(page.hits[0].name, "godmode", "official comes first when nothing else ranks them");
+    assert_eq!(page.hits[0].category.as_deref(), Some("security"));
+    assert_eq!(page.hits[1].category, None);
+    let page = hub.browse(Some("community"), "", 1).await.unwrap();
+    assert_eq!(page.total, 2);
+    assert_eq!(page.hits.len(), 1);
+    let page = hub.browse(Some("official"), "pdf", 10).await.unwrap();
+    assert_eq!(page.total, 0);
+    let page = hub.browse(None, "security", 10).await.unwrap();
+    assert_eq!(page.total, 1, "a category word and a tag both match Hermes' own skills");
+
     // An ambiguous name lists the identifiers; an identifier is exact.
     let InstallOutcome::Choose { candidates, note, .. } = hub.stage("pdf").await else { panic!() };
     assert_eq!(candidates.len(), 2);

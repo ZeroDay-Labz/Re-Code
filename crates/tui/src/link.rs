@@ -184,10 +184,15 @@ pub enum UiEvent {
         listings: Vec<recode_core::extensions::PluginListing>,
         error: Option<String>,
     },
-    /// Results of a skill hub search.
+    /// A page of the Hermes skills index, for the browse window.
     SkillSearch {
+        source: Option<String>,
         query: String,
         hits: Vec<recode_core::extensions::SkillSearchHit>,
+        /// Every match, not only the page.
+        total: usize,
+        /// Each source and how many skills it lists.
+        sources: Vec<(String, usize)>,
         note: Option<String>,
         error: Option<String>,
     },

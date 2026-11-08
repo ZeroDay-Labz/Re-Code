@@ -5,20 +5,20 @@ expression: "screen(&draw(app, width, height))"
                           ◆ re-code
 
   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │
- ╭ Skills ────────────────────────────────────────────────╮
-╭ Search skill hubs ───────────────────────────────────────╮
-│ Search  pdf▏                                             │
+╭ Browse skills ───────────────────────────────────────────╮
+│ Filter  pdf▏   2 of 1 234                                │
+│ Source  all 102 402 · official 141 · clawhub 82 671 ·  … │
 │                                                          │
 │ ❯ [ ] pdf   community                                    │
 │         Work with PDF files.  ·  anthropics/skills/skil… │
-│   [ ] pdf-forms   official                               │
+│   [ ] pdf-forms   official   documents                   │
 │         Fill PDF forms from structured data.  ·  NousRe… │
 │                                                          │
-│ enter install  tab tick  ^a all  ↑↓ choose  esc cancel   │
+│ enter install  tab tick  ^a all shown  ←→ source         │
 │                                                          │
 │                                                          │
 ╰──────────────────────────────────────────────────────────╯
  │                                                        │
  │                                                        │
  ╰────────────────────────────────────────────────────────╯
- a add  i install  e edit  space on/off  d delete  s search
+ a add  i install  e edit  space on/off  d delete  s browse

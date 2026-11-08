@@ -232,9 +232,18 @@ struct HermesSkill {
     repo: String,
     #[serde(default)]
     path: String,
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 impl HermesSkill {
+    /// Hermes files its own skills under `optional-skills/<category>/<name>`.
+    fn category(&self) -> Option<String> {
+        let rest = self.path.strip_prefix("optional-skills/")?;
+        let (category, _) = rest.split_once('/')?;
+        Some(category.to_owned())
+    }
+
     fn label(&self) -> String {
         if !self.source.is_empty() {
             self.source.clone()
@@ -253,8 +262,43 @@ impl HermesSkill {
             label: self.label(),
             repo: self.repo.clone(),
             path: self.path.clone(),
+            category: self.category(),
         }
     }
+
+    /// How well the skill matches typed words: 0 exact name … 3 words in the description; `None` not at all.
+    fn score(&self, query: &str, words: &[&str]) -> Option<u8> {
+        let name = self.name.to_lowercase();
+        let identifier = self.identifier.to_lowercase();
+        let description = self.description.to_lowercase();
+        Some(if name == query {
+            0
+        } else if name.starts_with(query) {
+            1
+        } else if name.contains(query) || identifier.contains(query) {
+            2
+        } else if words.iter().all(|word| {
+            description.contains(word)
+                || name.contains(word)
+                || self.tags.iter().any(|tag| tag.eq_ignore_ascii_case(word))
+                || self.category().is_some_and(|c| c == *word)
+        }) {
+            3
+        } else {
+            return None;
+        })
+    }
+}
+
+/// A page of the Hermes index: what matched, how many matched in all, and the sources it covers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillBrowse {
+    pub hits: Vec<SkillSearchHit>,
+    /// Every match, not only the page shown.
+    pub total: usize,
+    /// Each source with how many skills it lists, official first, then the largest.
+    pub sources: Vec<(String, usize)>,
+    pub note: Option<String>,
 }
 
 /// Fetches, stages, installs and updates skills. Share it with `Arc`.
@@ -793,6 +837,34 @@ impl Hub {
     }
 
     /// Searches the Hermes index by name, identifier and description.
+    /// Lists the index within one source (or all), narrowed by words; empty words list the source.
+    /// Results are ranked by match, then official first, then by name.
+    pub async fn browse(&self, source: Option<&str>, query: &str, limit: usize) -> Result<SkillBrowse, String> {
+        let query = query.trim().to_lowercase();
+        let words: Vec<&str> = query.split_whitespace().collect();
+        let (index, note) = self.hermes_index().await?;
+        let mut counts: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        for skill in index.iter() {
+            *counts.entry(skill.label()).or_default() += 1;
+        }
+        let mut sources: Vec<(String, usize)> = counts.into_iter().collect();
+        sources.sort_by(|a, b| {
+            (a.0 != "official").cmp(&(b.0 != "official")).then_with(|| b.1.cmp(&a.1)).then_with(|| a.0.cmp(&b.0))
+        });
+        let mut scored: Vec<(u8, bool, &HermesSkill)> = index
+            .iter()
+            .filter(|skill| source.is_none_or(|wanted| skill.label() == wanted))
+            .filter_map(|skill| {
+                let score = if words.is_empty() { 3 } else { skill.score(&query, &words)? };
+                Some((score, skill.label() != "official", skill))
+            })
+            .collect();
+        let total = scored.len();
+        scored.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)).then_with(|| a.2.name.cmp(&b.2.name)));
+        let hits = scored.into_iter().take(limit.max(1)).map(|(_, _, skill)| skill.hit()).collect();
+        Ok(SkillBrowse { hits, total, sources, note })
+    }
+
     pub async fn search(&self, query: &str, limit: usize) -> Result<SkillSearch, String> {
         let query = query.trim().to_lowercase();
         if query.is_empty() {

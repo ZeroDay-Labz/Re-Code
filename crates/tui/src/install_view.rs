@@ -516,24 +516,28 @@ impl App {
         vec![Action::Extension(ExtensionCommand::UpdateSkill(name))]
     }
 
-    /// `/skill search [words]` or `s` on the Skills tab.
-    pub fn open_skill_search(&mut self, query: Option<String>) -> Vec<Action> {
+    /// `/skill search [words]`, `/skill browse [source]`, or `s` on the Skills tab: the Hermes index,
+    /// listed at once and narrowed as you type.
+    pub fn open_skill_search(&mut self, query: Option<String>, source: Option<String>) -> Vec<Action> {
         if self.demo {
             self.toast("That isn't available in the demo recording.", ToastLevel::Info);
             return Vec::new();
         }
         let query = query.map(|q| q.trim().to_owned()).unwrap_or_default();
-        let searching = !query.is_empty();
+        let source = source.map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty() && s != "all");
         self.overlay = Some(Overlay::SkillSearch {
             query: query.clone(),
             hits: Vec::new(),
             selected: 0,
-            searching,
+            searching: true,
             error: None,
             note: None,
             ticked: BTreeSet::new(),
+            source: source.clone(),
+            sources: Vec::new(),
+            total: 0,
         });
-        if searching { vec![Action::Extension(ExtensionCommand::SearchSkills(query))] } else { Vec::new() }
+        vec![Action::Extension(ExtensionCommand::BrowseSkills { source, query })]
     }
 
     /// The driver finished staging. When the install window was closed meanwhile, a staged skill is
@@ -563,14 +567,9 @@ impl App {
         };
     }
 
-    /// The driver answered a hub search.
-    pub fn skill_search_result(
-        &mut self,
-        query: &str,
-        hits: Vec<SkillSearchHit>,
-        note: Option<String>,
-        error: Option<String>,
-    ) {
+    /// The driver answered a page of the index. A page for a source or words no longer shown is dropped.
+    pub fn skill_search_result(&mut self, page: BrowsePage) {
+        let BrowsePage { source, query, hits, total, sources, note, error } = page;
         if let Some(Overlay::SkillSearch {
             query: current,
             hits: shown,
@@ -578,19 +577,32 @@ impl App {
             searching,
             error: shown_error,
             note: shown_note,
+            source: current_source,
+            sources: shown_sources,
+            total: shown_total,
             ..
         }) = &mut self.overlay
             && current.trim() == query
+            && *current_source == source
         {
             *searching = false;
             *selected = 0;
             *shown_error = if hits.is_empty() && error.is_none() {
-                Some(format!("Nothing in the Hermes index matches \"{query}\"."))
+                let place = source.as_deref().map(|s| format!(" from {s}")).unwrap_or_default();
+                Some(if query.is_empty() {
+                    format!("The Hermes index lists nothing{place}.")
+                } else {
+                    format!("Nothing in the Hermes index{place} matches \"{query}\".")
+                })
             } else {
                 error
             };
             *shown_note = note;
             *shown = hits;
+            *shown_total = total;
+            if !sources.is_empty() {
+                *shown_sources = sources;
+            }
         }
     }
 
@@ -798,14 +810,34 @@ impl App {
     /// Keys while the hub search is open.
     pub(crate) fn skill_search_key(&mut self, key: KeyEvent) -> Vec<Action> {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let Some(Overlay::SkillSearch { query, hits, selected, searching, error, ticked, .. }) = &mut self.overlay
+        let Some(Overlay::SkillSearch { query, hits, selected, searching, error, ticked, source, sources, .. }) =
+            &mut self.overlay
         else {
             return Vec::new();
+        };
+        // Typing or changing source asks the index again; the answer replaces the page when it lands.
+        let ask = |source: &Option<String>, query: &str| {
+            vec![Action::Extension(ExtensionCommand::BrowseSkills { source: source.clone(), query: query.to_owned() })]
         };
         match key.code {
             KeyCode::Esc => self.overlay = None,
             KeyCode::Up => *selected = selected.saturating_sub(1),
             KeyCode::Down => *selected = (*selected + 1).min(hits.len().saturating_sub(1)),
+            KeyCode::PageUp => *selected = selected.saturating_sub(8),
+            KeyCode::PageDown => *selected = (*selected + 8).min(hits.len().saturating_sub(1)),
+            KeyCode::Left | KeyCode::Right if !sources.is_empty() => {
+                let names: Vec<&str> = sources.iter().map(|(name, _)| name.as_str()).collect();
+                let at = source.as_deref().and_then(|s| names.iter().position(|n| *n == s)).map_or(0, |i| i + 1);
+                let count = names.len() + 1;
+                let next = if key.code == KeyCode::Right { (at + 1) % count } else { (at + count - 1) % count };
+                *source = if next == 0 { None } else { Some(names[next - 1].to_owned()) };
+                // Another source's rows would be wrong to keep; a narrowed query's are still right.
+                hits.clear();
+                *selected = 0;
+                *searching = true;
+                *error = None;
+                return ask(source, query);
+            }
             KeyCode::Tab => {
                 if let Some(hit) = hits.get(*selected)
                     && !ticked.remove(&hit.tap)
@@ -822,13 +854,17 @@ impl App {
             }
             KeyCode::Backspace => {
                 query.pop();
-                hits.clear();
+                *selected = 0;
+                *searching = true;
                 *error = None;
+                return ask(source, query);
             }
             KeyCode::Char(c) if !ctrl => {
                 query.push(c);
-                hits.clear();
+                *selected = 0;
+                *searching = true;
                 *error = None;
+                return ask(source, query);
             }
             KeyCode::Enter if !ticked.is_empty() => {
                 let taps: Vec<String> = ticked.iter().cloned().collect();
@@ -838,10 +874,10 @@ impl App {
                 if let Some(hit) = hits.get((*selected).min(hits.len().saturating_sub(1))) {
                     let tap = hit.tap.clone();
                     return self.start_install(tap);
-                } else if !query.trim().is_empty() && !*searching {
+                } else if !*searching {
                     *searching = true;
                     *error = None;
-                    return vec![Action::Extension(ExtensionCommand::SearchSkills(query.trim().to_owned()))];
+                    return ask(source, query);
                 }
             }
             _ => {}
@@ -1394,7 +1430,19 @@ fn draw_batch(frame: &mut Frame<'_>, area: Rect, kind: InstallKind, items: &[Bat
     boxed(frame, rect, title, lines);
 }
 
-/// What the search window shows.
+/// One page of the index as the driver answers it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BrowsePage {
+    pub source: Option<String>,
+    pub query: String,
+    pub hits: Vec<SkillSearchHit>,
+    pub total: usize,
+    pub sources: Vec<(String, usize)>,
+    pub note: Option<String>,
+    pub error: Option<String>,
+}
+
+/// What the browse window shows.
 pub struct SearchView<'a> {
     pub query: &'a str,
     pub hits: &'a [SkillSearchHit],
@@ -1403,61 +1451,120 @@ pub struct SearchView<'a> {
     pub error: Option<&'a str>,
     pub note: Option<&'a str>,
     pub ticked: &'a BTreeSet<String>,
+    pub source: Option<&'a str>,
+    pub sources: &'a [(String, usize)],
+    pub total: usize,
 }
 
-/// The hub search: a query line, then hits with their label and where they live.
+/// Thousands separated with a thin space, so 103386 reads as 103 386.
+fn grouped(n: usize) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push('\u{2009}');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// The index browser: a filter line, the sources with their counts, then a page of hits with their
+/// label, category and where they live.
 pub fn draw_skill_search(frame: &mut Frame<'_>, area: Rect, view: &SearchView<'_>) {
-    let SearchView { query, hits, selected, searching, error, note, ticked } = *view;
-    let rows = u16::try_from(hits.len().min(8) * 2).unwrap_or(16);
-    let rect = overlay_area(area, 90, rows + 8);
+    let SearchView { query, hits, selected, searching, error, note, ticked, source, sources, total } = *view;
+    let rows = u16::try_from(hits.len().min(9) * 2).unwrap_or(18);
+    let rect = overlay_area(area, 96, rows + 8 + u16::from(!sources.is_empty()));
     let inner = usize::from(rect.width).saturating_sub(4);
+    let all: usize = sources.iter().map(|(_, n)| n).sum();
+    let count = if hits.is_empty() || searching {
+        String::new()
+    } else if hits.len() < total {
+        format!("   {} of {}", hits.len(), grouped(total))
+    } else {
+        format!("   {total}")
+    };
     let mut lines = vec![Line::from(vec![
-        Span::styled("Search  ", theme::muted()),
+        Span::styled("Filter  ", theme::muted()),
         Span::raw(query.to_owned()),
         Span::styled("▏", theme::accent()),
+        Span::styled(count, theme::muted()),
     ])];
+    if !sources.is_empty() {
+        let mut spans = vec![Span::styled("Source  ", theme::muted())];
+        let mut cells = vec![("all".to_owned(), all, source.is_none())];
+        cells.extend(sources.iter().map(|(name, n)| (name.clone(), *n, source == Some(name.as_str()))));
+        let mut used = 8;
+        for (name, n, lit) in cells {
+            let cell = format!("{name} {}", grouped(n));
+            if used + cell.chars().count() + 3 > inner {
+                spans.push(Span::styled(" …", theme::muted()));
+                break;
+            }
+            used += cell.chars().count() + 3;
+            let style = if lit {
+                Style::new().fg(theme::color(Token::Accent)).add_modifier(Modifier::BOLD)
+            } else {
+                theme::muted()
+            };
+            spans.push(Span::styled(cell, style));
+            spans.push(Span::styled(" · ", theme::muted()));
+        }
+        if spans.last().is_some_and(|s| s.content == " · ") {
+            spans.pop();
+        }
+        lines.push(Line::from(spans));
+    }
     lines.push(Line::default());
-    if searching {
-        lines.push(Line::styled("Searching the Hermes index…", theme::muted()));
+    if searching && hits.is_empty() && sources.is_empty() {
+        lines
+            .push(Line::styled("Loading the Hermes index (about 42 MB, fetched once a day and kept)…", theme::muted()));
+    } else if searching && hits.is_empty() {
+        lines.push(Line::styled("Looking…", theme::muted()));
     } else if let Some(error) = error {
         lines.extend(wrap_plain(error, Style::new().fg(theme::color(Token::Danger)), inner));
-    } else if hits.is_empty() {
-        lines.push(Line::styled(
-            "Type part of a skill's name and press Enter. Results come from the Hermes Agent skills index (100k skills, fetched daily).",
-            theme::muted(),
-        ));
     }
     if let Some(note) = note {
         lines.extend(wrap_plain(note, theme::muted(), inner));
     }
-    let first = selected.saturating_sub(7);
-    for (index, hit) in hits.iter().enumerate().skip(first).take(8) {
+    let first = selected.saturating_sub(8);
+    for (index, hit) in hits.iter().enumerate().skip(first).take(9) {
         let base = if index == selected {
             Style::new().bg(theme::color(Token::UserBg)).add_modifier(Modifier::BOLD)
         } else {
             Style::new()
         };
-        lines.push(Line::from(vec![
+        let mut row = vec![
             Span::styled(if index == selected { "❯ " } else { "  " }, theme::accent().patch(base)),
             tickbox(ticked.contains(&hit.tap), base),
-            Span::styled(truncate(&hit.name, inner.saturating_sub(18)), base),
+            Span::styled(truncate(&hit.name, inner.saturating_sub(30)), base),
             Span::raw("  "),
             chip(hit.label.clone(), label_color(&hit.label)),
-        ]));
+        ];
+        if let Some(category) = &hit.category {
+            row.push(Span::raw(" "));
+            row.push(chip(category.clone(), theme::color(Token::Muted)));
+        }
+        lines.push(Line::from(row));
         let place = if hit.path.is_empty() { hit.repo.clone() } else { format!("{}/{}", hit.repo, hit.path) };
         let detail = if hit.description.is_empty() { place } else { format!("{}  ·  {place}", hit.description) };
         lines.push(Line::styled(format!("        {}", truncate(&detail, inner.saturating_sub(8))), theme::muted()));
     }
     lines.push(Line::default());
     let keys: &[(&str, &str)] = if hits.is_empty() {
-        &[("enter", "search"), ("esc", "cancel")]
+        &[("type", "to narrow"), ("←→", "source"), ("esc", "cancel")]
     } else if ticked.is_empty() {
-        &[("enter", "install"), ("tab", "tick"), ("^a", "all"), ("↑↓", "choose"), ("esc", "cancel")]
+        &[("enter", "install"), ("tab", "tick"), ("^a", "all shown"), ("←→", "source"), ("esc", "cancel")]
     } else {
-        &[("enter", "install ticked"), ("tab", "tick"), ("^a", "all"), ("↑↓", "choose"), ("esc", "cancel")]
+        &[("enter", "install ticked"), ("tab", "tick"), ("^a", "all shown"), ("←→", "source"), ("esc", "cancel")]
     };
     lines.push(legend(keys, inner));
-    boxed(frame, rect, "Search skill hubs", lines);
+    let title = match source {
+        Some("official") => "Hermes' own skills".to_owned(),
+        Some(name) => format!("Skills from {name}"),
+        None => "Browse skills".to_owned(),
+    };
+    boxed(frame, rect, &title, lines);
 }
 
 /// A colour per label: official and builtin stand out, the rest are neutral.

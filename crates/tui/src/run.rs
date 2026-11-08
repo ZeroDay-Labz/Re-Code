@@ -299,7 +299,17 @@ fn apply_event(app: &mut App, event: UiEvent) {
             app.install_batch(items.into_iter().map(|(tap, o)| (tap, Err(o))).collect())
         }
         UiEvent::PluginListings { title, listings, error } => app.plugin_listings(&title, listings, error),
-        UiEvent::SkillSearch { query, hits, note, error } => app.skill_search_result(&query, hits, note, error),
+        UiEvent::SkillSearch { source, query, hits, total, sources, note, error } => {
+            app.skill_search_result(crate::install_view::BrowsePage {
+                source,
+                query,
+                hits,
+                total,
+                sources,
+                note,
+                error,
+            });
+        }
         UiEvent::ToolStatus { active, summary } => {
             app.tool_status = Some((active, crate::sanitize::sanitize(&summary)))
         }
