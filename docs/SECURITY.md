@@ -148,6 +148,9 @@ just the raw call.
 stay off until the user trusts the folder. Switching one on, or `/trust`, shows exactly what would load
 (each skill and file by path) and asks. Trust is stored per canonical folder path with a fingerprint of the
 `.re-code/` tree's content, so any change asks again. Symbolic links under `.re-code/` are never followed.
+A sandboxed stdio MCP server also sees, read-only, the folders its own configuration names (the project
+around a script it runs, folders and files in its arguments or environment), never the home folder itself,
+a broad folder such as `~/.config`, or a secret folder (`probe::own_paths`).
 Every skill, from any source, is also scanned before it can be enabled (`crates/extensions/src/scan.rs`):
 piped-to-shell downloads, decode-and-execute, destructive deletes, credential reads, exfiltration of
 environment variables, prompt-injection phrases and invisible characters. A `dangerous` verdict is never

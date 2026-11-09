@@ -19,6 +19,59 @@ const STDERR_TAIL: usize = 40;
 /// A connected MCP client.
 pub(crate) type McpClient = rmcp::service::RunningService<rmcp::RoleClient, ()>;
 
+/// Folders under the home folder that a server's command, arguments and settings name, so the sandbox
+/// can show them read-only: a script's project (the nearest folder above it holding `package.json`,
+/// `.git`, `pyproject.toml`, `Cargo.toml` or `go.mod`, else its own folder), a named folder itself.
+/// Never the home folder or one of its broad shared folders; the sandbox still hides secrets inside.
+#[must_use]
+pub fn own_paths(
+    command: &str,
+    args: &[String],
+    env: &[(String, String)],
+    home: &std::path::Path,
+) -> Vec<std::path::PathBuf> {
+    use std::path::{Path, PathBuf};
+    const MARKERS: &[&str] = &["package.json", ".git", "pyproject.toml", "Cargo.toml", "go.mod"];
+    const TOO_BROAD: &[&str] =
+        &[".config", ".local", ".local/share", ".local/state", ".cache", "Documents", "Downloads"];
+    const SECRET: &[&str] = &[".ssh", ".gnupg", ".password-store", ".aws", ".kube", ".docker"];
+    let mut candidates: Vec<&str> = vec![command];
+    for text in args.iter().chain(env.iter().map(|(_, value)| value)) {
+        // `--flag=/path` as well as `/path`; a PATH-like list of folders too.
+        let text = text.split_once('=').map_or(text.as_str(), |(_, value)| value);
+        candidates.extend(text.split(':'));
+    }
+    let allowed = |path: &Path| {
+        path.starts_with(home)
+            && path != home
+            && !TOO_BROAD.iter().any(|broad| path == home.join(broad))
+            && !SECRET.iter().any(|secret| path.starts_with(home.join(secret)))
+    };
+    let mut found: Vec<PathBuf> = Vec::new();
+    for candidate in candidates {
+        let path = Path::new(candidate.trim());
+        if !path.is_absolute() || !path.starts_with(home) || !path.exists() {
+            continue;
+        }
+        let root = if path.is_dir() {
+            path.to_path_buf()
+        } else {
+            let parent = path.parent().unwrap_or(path);
+            parent
+                .ancestors()
+                .take_while(|ancestor| allowed(ancestor))
+                .find(|ancestor| MARKERS.iter().any(|marker| ancestor.join(marker).exists()))
+                .unwrap_or(parent)
+                .to_path_buf()
+        };
+        if allowed(&root) && !found.iter().any(|known| root.starts_with(known)) {
+            found.retain(|known| !known.starts_with(&root));
+            found.push(root);
+        }
+    }
+    found
+}
+
 /// Whether `command` can be found: an existing path, or a name on PATH.
 fn program_exists(command: &str) -> bool {
     let path = std::path::Path::new(command);
@@ -82,11 +135,19 @@ impl Launch {
             return (command.to_owned(), args.to_vec(), env.to_vec(), false);
         }
         let project = self.project.clone().unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-        let grants: Vec<recode_tools::sandbox::Grant> = self
+        let mut grants: Vec<recode_tools::sandbox::Grant> = self
             .writable
             .iter()
             .map(|path| recode_tools::sandbox::Grant { path: path.clone(), writable: true })
             .collect();
+        // What the server's own configuration names (its script, JAVA_HOME, a jar…) it may read.
+        if let Some(home) = &self.home {
+            for path in own_paths(command, args, env, home) {
+                if !grants.iter().any(|grant| path.starts_with(&grant.path)) {
+                    grants.push(recode_tools::sandbox::Grant { path, writable: false });
+                }
+            }
+        }
         let policy = recode_tools::sandbox::Policy { network: true };
         let mut bwrap = recode_tools::sandbox::bwrap_args(&project, self.home.as_deref(), &[], policy, &grants);
         for (key, value) in env {
@@ -125,9 +186,11 @@ pub(crate) async fn connect(server: &McpServer, launch: &Launch) -> Result<McpCl
                     }
                 })?;
             let tail = std::sync::Arc::new(std::sync::Mutex::new(std::collections::VecDeque::<String>::new()));
+            let (finished, ended) = tokio::sync::oneshot::channel::<()>();
             if let Some(stderr) = stderr {
                 let (tail, name) = (tail.clone(), server.name.clone());
                 tokio::spawn(async move {
+                    let _finished = finished;
                     use tokio::io::AsyncBufReadExt;
                     let mut lines = tokio::io::BufReader::new(stderr).lines();
                     while let Ok(Some(line)) = lines.next_line().await {
@@ -144,8 +207,8 @@ pub(crate) async fn connect(server: &McpServer, launch: &Launch) -> Result<McpCl
             match ().serve(transport).await {
                 Ok(client) => Ok(client),
                 Err(error) => {
-                    // Give the output a moment to arrive: a crash usually explains itself on stderr.
-                    tokio::time::sleep(Duration::from_millis(150)).await;
+                    // A crash usually explains itself on stderr: wait for that output to end (briefly).
+                    let _ = tokio::time::timeout(Duration::from_secs(3), ended).await;
                     let lines: Vec<String> = tail
                         .lock()
                         .map(|tail| tail.iter().map(|line| line.trim().to_owned()).filter(|l| !l.is_empty()).collect())
@@ -289,6 +352,35 @@ pub(crate) fn resolve(values: &BTreeMap<String, String>) -> Result<BTreeMap<Stri
 mod launch_tests {
     use super::*;
     use std::collections::BTreeMap;
+
+    #[test]
+    fn a_server_may_read_what_its_own_configuration_names_and_nothing_broad() {
+        let dir = tempfile::tempdir().unwrap();
+        let home = dir.path();
+        let repo = home.join(".local/share/rea/rea-git");
+        std::fs::create_dir_all(repo.join("scripts")).unwrap();
+        std::fs::create_dir_all(repo.join(".git")).unwrap();
+        std::fs::write(repo.join("scripts/rea.mjs"), "").unwrap();
+        let jdk = home.join("jdk-21");
+        std::fs::create_dir_all(&jdk).unwrap();
+        let loose = home.join("tools/thing.jar");
+        std::fs::create_dir_all(loose.parent().unwrap()).unwrap();
+        std::fs::write(&loose, "").unwrap();
+        std::fs::create_dir_all(home.join(".ssh")).unwrap();
+        std::fs::create_dir_all(home.join(".config")).unwrap();
+        let args = vec![repo.join("scripts/rea.mjs").display().to_string(), "mcp".to_owned()];
+        let env = vec![
+            ("JAVA_HOME".to_owned(), jdk.display().to_string()),
+            ("JAR".to_owned(), format!("--jar={}", loose.display())),
+            ("KEYS".to_owned(), home.join(".ssh").display().to_string()),
+            ("CONF".to_owned(), home.join(".config").display().to_string()),
+            ("HOME_ITSELF".to_owned(), home.display().to_string()),
+            ("ELSEWHERE".to_owned(), "/usr/lib".to_owned()),
+        ];
+        let paths = own_paths("/usr/bin/node", &args, &env, home);
+        // The script's repository (marked by .git), the named JDK folder, the jar's own folder.
+        assert_eq!(paths, vec![repo, jdk, home.join("tools")]);
+    }
 
     fn server(sandbox: McpSandbox) -> McpServer {
         McpServer {

@@ -5,6 +5,20 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-08
+
+### Fixed
+
+- A sandboxed stdio MCP server couldn't read its own files when they live in the home folder (which the
+  sandbox empties), so servers such as REA (`node ~/.local/share/rea/rea-git/scripts/rea.mjs`) failed to
+  start. The sandbox now shows a server, read-only, the folders its own command line and settings name:
+  a script's project (the nearest folder above it with `package.json`, `.git`, `pyproject.toml`,
+  `Cargo.toml` or `go.mod`), and folders and files named in its arguments or environment (`JAVA_HOME`, a
+  jar). Never the home folder itself or a broad folder like `~/.config`, and secret folders stay hidden.
+  Verified live: REA connects inside bubblewrap with its 241 tools.
+- When a server fails to start, re-code waits for its error output to end (up to three seconds) instead
+  of a fixed 150 ms, so the explaining line is in the message even when the server is slow to print it.
+
 ## [0.1.9] - 2026-11-08
 
 ### Added
