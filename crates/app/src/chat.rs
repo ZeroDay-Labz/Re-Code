@@ -941,14 +941,24 @@ async fn drive(
     // Skill installs: fetched into the cache, scanned, shown, then moved into the skills folder.
     let (skill_hub, plugin_hub): (Option<std::sync::Arc<Hub>>, Option<std::sync::Arc<PluginHub>>) =
         match Fetcher::new(Bases::from_env()) {
-            Ok(fetcher) => (
-                Some(std::sync::Arc::new(Hub::new(fetcher.clone(), paths.cache_dir.clone(), paths.skills_dir.clone()))),
-                Some(std::sync::Arc::new(PluginHub::new(
-                    fetcher,
-                    paths.cache_dir.clone(),
-                    paths.data_dir.join("plugins"),
-                ))),
-            ),
+            Ok(fetcher) => {
+                let sink = events.clone();
+                let fetcher = fetcher.with_progress(recode_extensions::fetch::Progress::new(move |text| {
+                    let _ = sink.send(UiEvent::HubProgress(text));
+                }));
+                (
+                    Some(std::sync::Arc::new(Hub::new(
+                        fetcher.clone(),
+                        paths.cache_dir.clone(),
+                        paths.skills_dir.clone(),
+                    ))),
+                    Some(std::sync::Arc::new(PluginHub::new(
+                        fetcher,
+                        paths.cache_dir.clone(),
+                        paths.data_dir.join("plugins"),
+                    ))),
+                )
+            }
             Err(error) => {
                 tracing::warn!(%error, "skill and plugin installs unavailable");
                 (None, None)

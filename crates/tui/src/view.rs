@@ -978,10 +978,11 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
         Overlay::Confirm(confirm) => draw_confirm(frame, area, &confirm),
         Overlay::McpPresets { selected } => draw_mcp_presets(frame, area, selected),
         Overlay::WebSetup { selected } => draw_web_setup(frame, area, selected),
+        Overlay::Onboarding { step } => crate::onboarding::draw(frame, area, app, step),
         Overlay::McpSearch { query, hits, selected, searching, error } => {
             draw_mcp_search(frame, area, &query, &hits, selected, searching, error.as_deref());
         }
-        Overlay::Install(state) => crate::install_view::draw_install(frame, area, &state),
+        Overlay::Install(state) => crate::install_view::draw_install(frame, area, &state, app.hub_progress.as_deref()),
         Overlay::PluginBrowse { title, listings, filter, selected, loading, error, ticked, category } => {
             crate::install_view::draw_plugin_browse(
                 frame,
@@ -1008,6 +1009,7 @@ fn draw_overlay(frame: &mut Frame<'_>, area: Rect, app: &mut App) {
                 source: source.as_deref(),
                 sources: &sources,
                 total,
+                progress: app.hub_progress.as_deref(),
             };
             crate::install_view::draw_skill_search(frame, area, &view);
         }

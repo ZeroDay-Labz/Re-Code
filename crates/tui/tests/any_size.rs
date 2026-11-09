@@ -344,6 +344,13 @@ fn plugin_browse() -> App {
     app
 }
 
+/// The first-run tour on its first step.
+fn onboarding() -> App {
+    let mut app = home_on(HomeTab::Home, sample_extensions());
+    app.overlay = Some(Overlay::Onboarding { step: 0 });
+    app
+}
+
 /// `/web` with its picker open.
 fn web_setup() -> App {
     let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
@@ -753,9 +760,12 @@ fn dragging_selects_what_is_on_screen_and_copies_it() {
     assert!(copied.lines().count() == 2, "two rows were selected: {copied:?}");
     assert!(shown.contains("copies the selection"), "the status line says how to copy again");
     assert!(app.last_toast().is_some_and(|text| text.starts_with("Copied")));
-    // A click without a drag copies nothing.
-    app.mouse_down(x, row, false);
-    assert!(!matches!(app.mouse_up(x, row)[..], [recode_tui::app::Action::Copy(_)]));
+    // A click without a drag on prose copies nothing (a click on a code line copies that line).
+    let prose = (y..y + height)
+        .find(|row| text.lines().nth(usize::from(*row)).is_some_and(|line| line.contains("Things to check next")))
+        .expect("the request, which is prose");
+    app.mouse_down(x, prose, false);
+    assert!(!matches!(app.mouse_up(x, prose)[..], [recode_tui::app::Action::Copy(_)]));
 }
 
 #[test]
@@ -810,6 +820,110 @@ fn a_triple_click_copies_a_whole_message_even_taller_than_the_screen() {
     assert!(copied.lines().count() > usize::from(height), "the whole message, not just what's visible");
     assert!(copied.contains("MAX_RETRIES") && copied.contains("Things to check next"), "{copied}");
     assert!(!copied.contains("The retry loop in auth.rs never backs off"), "only that message, not the request");
+}
+
+#[test]
+fn clicking_a_code_line_copies_that_line_and_prose_does_not() {
+    use recode_tui::transcript::Entry;
+    let mut app = finished();
+    app.transcript.push(Entry::Assistant(
+        "Run this:\n\n```rust\nlet retries = MAX_RETRIES_FOR_THE_UPSTREAM_SERVICE_WHEN_IT_ANSWERS_SLOWLY_AND_THE_LINE_WRAPS;\nprintln!(\"{retries}\");\n```\n\nThat's all.".to_owned(),
+    ));
+    app.transcript.follow();
+    let text = screen(&draw(&mut app, 60, 30));
+    let (x, y, _, height) = app.transcript_rect;
+    let row_of = |needle: &str| {
+        (y..y + height)
+            .find(|row| text.lines().nth(usize::from(*row)).is_some_and(|line| line.contains(needle)))
+            .unwrap_or_else(|| panic!("{needle} is on screen\n{text}"))
+    };
+    let click = |app: &mut App, row: u16| {
+        app.mouse_down(x + 3, row, false);
+        app.mouse_up(x + 3, row)
+    };
+    // The wrapped part of a long line copies the whole source line, without the gutter.
+    let wrapped = (row_of("let retries") + 1..y + height)
+        .find(|row| text.lines().nth(usize::from(*row)).is_some_and(|line| line.contains('↪')))
+        .expect("the long line wraps");
+    let actions = click(&mut app, wrapped);
+    assert!(
+        matches!(actions.as_slice(), [Action::Copy(line)] if line == "let retries = MAX_RETRIES_FOR_THE_UPSTREAM_SERVICE_WHEN_IT_ANSWERS_SLOWLY_AND_THE_LINE_WRAPS;"),
+        "{actions:?}"
+    );
+    // Pause past the double-click window so the next click counts as a single one.
+    app.now += std::time::Duration::from_secs(1);
+    let actions = click(&mut app, row_of("println!"));
+    assert!(matches!(actions.as_slice(), [Action::Copy(line)] if line == "println!(\"{retries}\");"), "{actions:?}");
+    app.now += std::time::Duration::from_secs(1);
+    // The language label and prose aren't code lines.
+    assert!(click(&mut app, row_of("That's all.")).iter().all(|a| !matches!(a, Action::Copy(_))));
+}
+
+#[test]
+fn the_first_run_tour_opens_once_describes_what_was_found_and_starts_nothing() {
+    // A first run: settings arrived without the tour's record, and no saved sessions.
+    let mut app = home_on(HomeTab::Home, sample_extensions());
+    app.settings_loaded = true;
+    app.sessions_listed(Vec::new());
+    assert!(matches!(app.overlay, Some(Overlay::Onboarding { step: 0 })));
+    let text = screen(&draw(&mut app, 120, 40));
+    assert!(text.contains("Welcome to re-code") && text.contains("1 of 3") && text.contains("What it found"), "{text}");
+    assert!(text.contains("local models") && text.contains("Nothing starts by itself"), "{text}");
+    // Steps forward and back; the second counts what's connected.
+    assert!(app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)).is_empty());
+    let text = screen(&draw(&mut app, 120, 40));
+    assert!(text.contains("What it can reach") && text.contains("4 MCP servers") && text.contains("skills"), "{text}");
+    app.handle_key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+    let text = screen(&draw(&mut app, 120, 40));
+    assert!(
+        text.contains("How it stays in your hands") && text.contains("bubblewrap") && text.contains("/tour"),
+        "{text}"
+    );
+    app.handle_key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+    assert!(matches!(app.overlay, Some(Overlay::Onboarding { step: 1 })));
+    // w ends the tour, records it, and opens web search setup; nothing else is asked of the driver.
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::NONE));
+    assert!(
+        matches!(actions.as_slice(), [Action::SetSetting { key, value }] if key == "onboarded" && value == "1"),
+        "{actions:?}"
+    );
+    assert!(matches!(app.overlay, Some(Overlay::WebSetup { .. })));
+    // Recorded: it doesn't open again.
+    app.overlay = None;
+    app.sessions_listed(Vec::new());
+    assert!(app.overlay.is_none());
+
+    // m goes to the Models tab; Esc skips; existing users with sessions never see it; --no-onboarding.
+    let mut app = home_on(HomeTab::Home, sample_extensions());
+    app.settings_loaded = true;
+    app.sessions_listed(Vec::new());
+    app.handle_key(KeyEvent::new(KeyCode::Char('m'), KeyModifiers::NONE));
+    assert!(matches!(&app.screen, Screen::Welcome(welcome) if welcome.tab == HomeTab::Models));
+    let mut app = home_on(HomeTab::Home, sample_extensions());
+    app.settings_loaded = true;
+    app.sessions_listed(Vec::new());
+    let actions = app.handle_key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.overlay.is_none() && matches!(actions.as_slice(), [Action::SetSetting { .. }]));
+    let mut app = home_on(HomeTab::Home, sample_extensions());
+    app.settings_loaded = true;
+    app.no_onboarding = true;
+    app.sessions_listed(Vec::new());
+    assert!(app.overlay.is_none());
+
+    // /tour opens it any time.
+    let mut app = App::new(Instant::now(), "api-server", "gpt-oss:20b", "", false);
+    app.input.insert("/tour");
+    app.handle_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(matches!(app.overlay, Some(Overlay::Onboarding { step: 0 })));
+}
+
+#[test]
+fn hub_progress_shows_while_a_window_waits_and_goes_when_the_answer_lands() {
+    let mut app = home_on(HomeTab::Skills, sample_extensions());
+    app.open_install(Some("official/security/godmode".to_owned()));
+    app.hub_progress = Some("godmode: 3 of 9 files (12 kB of 40 kB)".to_owned());
+    let text = screen(&draw(&mut app, 120, 36));
+    assert!(text.contains("Fetching official/security/godmode") && text.contains("3 of 9 files"), "{text}");
 }
 
 #[test]
@@ -1220,6 +1334,11 @@ fn every_scene() -> Vec<(&'static str, App)> {
     scenes.push(("install caution", install_preview("caution")));
     scenes.push(("install choose", install_choose()));
     scenes.push(("install batch", install_batch()));
+    for step in 0..3 {
+        let mut app = onboarding();
+        app.overlay = Some(Overlay::Onboarding { step });
+        scenes.push(("onboarding", app));
+    }
     scenes.push(("skill search", skill_search()));
     scenes.push(("plugins tab", home_on(HomeTab::Plugins, sample_extensions())));
     scenes.push(("web setup", web_setup()));
@@ -2792,6 +2911,7 @@ fn snapshots_at_typical_sizes() {
         snapshot("plugin_preview", &mut plugin_preview(), width, height);
         snapshot("plugin_browse", &mut plugin_browse(), width, height);
         snapshot("web_setup", &mut web_setup(), width, height);
+        snapshot("onboarding", &mut onboarding(), width, height);
     }
 }
 

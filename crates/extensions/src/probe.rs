@@ -13,6 +13,8 @@ use tokio::process::Command;
 /// Long enough for `npx` to fetch a package on first use.
 const TIMEOUT: Duration = Duration::from_secs(45);
 const CHARS_PER_TOKEN: usize = 3;
+/// How many of a server's stderr lines are kept to explain a failed start.
+const STDERR_TAIL: usize = 40;
 
 /// A connected MCP client.
 pub(crate) type McpClient = rmcp::service::RunningService<rmcp::RoleClient, ()>;
@@ -107,25 +109,62 @@ pub(crate) async fn connect(server: &McpServer, launch: &Launch) -> Result<McpCl
             }
             let (program, argv, direct_env, sandboxed) = launch.command_for(server, command, args, &resolved);
             let mut process = Command::new(&program);
-            process.args(&argv).stderr(Stdio::null()).kill_on_drop(true);
+            process.args(&argv).kill_on_drop(true);
             for (key, value) in direct_env {
                 process.env(key, value);
             }
-            let transport = TokioChildProcess::new(process).map_err(|error| {
-                if sandboxed {
-                    format!("Couldn't start {command} in the sandbox: {error}")
-                } else {
-                    format!("Couldn't start {command}: {error}")
+            // The server's own error output must never reach the terminal: drawn over the interface it
+            // garbles the screen (a crashing Node server prints its whole stack). rmcp inherits stderr
+            // unless told otherwise, so it's piped here, logged, and its last lines kept for errors.
+            let (transport, stderr) =
+                TokioChildProcess::builder(process).stderr(Stdio::piped()).spawn().map_err(|error| {
+                    if sandboxed {
+                        format!("Couldn't start {command} in the sandbox: {error}")
+                    } else {
+                        format!("Couldn't start {command}: {error}")
+                    }
+                })?;
+            let tail = std::sync::Arc::new(std::sync::Mutex::new(std::collections::VecDeque::<String>::new()));
+            if let Some(stderr) = stderr {
+                let (tail, name) = (tail.clone(), server.name.clone());
+                tokio::spawn(async move {
+                    use tokio::io::AsyncBufReadExt;
+                    let mut lines = tokio::io::BufReader::new(stderr).lines();
+                    while let Ok(Some(line)) = lines.next_line().await {
+                        tracing::debug!(server = %name, "{line}");
+                        if let Ok(mut tail) = tail.lock() {
+                            // The start of the output names the problem; the rest of a stack adds little.
+                            if tail.len() < STDERR_TAIL {
+                                tail.push_back(line.chars().take(300).collect());
+                            }
+                        }
+                    }
+                });
+            }
+            match ().serve(transport).await {
+                Ok(client) => Ok(client),
+                Err(error) => {
+                    // Give the output a moment to arrive: a crash usually explains itself on stderr.
+                    tokio::time::sleep(Duration::from_millis(150)).await;
+                    let lines: Vec<String> = tail
+                        .lock()
+                        .map(|tail| tail.iter().map(|line| line.trim().to_owned()).filter(|l| !l.is_empty()).collect())
+                        .unwrap_or_default();
+                    // The line naming the error says the most (Node's comes before its stack); else the last.
+                    let said = lines
+                        .iter()
+                        .find(|line| line.contains("Error") || line.contains("error:") || line.starts_with("panicked"))
+                        .or(lines.last())
+                        .map(|line| format!(" It said: {}.", line.trim_end_matches('.')))
+                        .unwrap_or_default();
+                    let hint = if sandboxed {
+                        " It ran in bubblewrap: if it needs files or folders the sandbox hides, set its Sandbox to none in the form."
+                    } else {
+                        ""
+                    };
+                    Err(format!("The server didn't complete the MCP handshake: {error}.{said}{hint}"))
                 }
-            })?;
-            ().serve(transport).await.map_err(|error| {
-                let hint = if sandboxed {
-                    " It ran in bubblewrap: if it needs files or folders the sandbox hides, set its Sandbox to none in the form."
-                } else {
-                    ""
-                };
-                format!("The server didn't complete the MCP handshake: {error}.{hint}")
-            })
+            }
         }
         McpTransport::Http { url, headers } => {
             let mut config = StreamableHttpClientTransportConfig::with_uri(url.as_str());

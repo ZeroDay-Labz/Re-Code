@@ -10,13 +10,13 @@ expression: "screen(&draw(app, width, height))"
 │   config.                                                │
 ╭ commands ────────────────────────────────────────────────╮
 │❯ /help                                 Keyboard shortcuts│
+│  /tour     The three-step introduction from the first run│
 │  /model                                      Switch model│
 │  /mcp                                         MCP servers│
 │  /tools                                      Custom tools│
 │  /skills                                           Skills│
 │  /providers                  Model providers and API keys│
 │  /add-dir <folder>  Let the agent read and change a fold…│
-│  /undo                  Undo the last turn's file changes│
 ╰──────────────────────────────── tab complete · esc close ╯
 ╭ ● Ready │ DEMO │ ctx ~6.0k/32k │ 100 tok/s │ tasks 1/3 ──╮
 │ ❯  /                                                     │

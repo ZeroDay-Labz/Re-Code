@@ -15,6 +15,7 @@ pub struct SlashCommand {
 
 pub const SLASH_COMMANDS: &[SlashCommand] = &[
     SlashCommand { name: "help", argument: "", description: "Keyboard shortcuts" },
+    SlashCommand { name: "tour", argument: "", description: "The three-step introduction from the first run" },
     SlashCommand { name: "model", argument: "", description: "Switch model" },
     SlashCommand { name: "mcp", argument: "", description: "MCP servers" },
     SlashCommand { name: "tools", argument: "", description: "Custom tools" },

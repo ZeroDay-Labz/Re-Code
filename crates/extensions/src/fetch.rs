@@ -137,6 +137,27 @@ pub struct Downloaded {
     pub skipped: Vec<(String, String)>,
 }
 
+/// Where a fetch says how far it has got: "Listing owner/repo…", "pdf: 12 of 40 files", "Hermes index:
+/// 12.0 of 42.1 MB". Called from download tasks, so it must be cheap and thread-safe.
+#[derive(Clone)]
+pub struct Progress(std::sync::Arc<dyn Fn(String) + Send + Sync>);
+
+impl Progress {
+    pub fn new(report: impl Fn(String) + Send + Sync + 'static) -> Self {
+        Self(std::sync::Arc::new(report))
+    }
+
+    fn say(&self, text: String) {
+        (self.0)(text);
+    }
+}
+
+impl std::fmt::Debug for Progress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Progress")
+    }
+}
+
 /// The client. Cheap to clone.
 #[derive(Debug, Clone)]
 pub struct Fetcher {
@@ -144,6 +165,7 @@ pub struct Fetcher {
     bases: Bases,
     /// `GITHUB_TOKEN` from the environment, sent to the GitHub API only. Never stored.
     github_token: Option<String>,
+    progress: Option<Progress>,
 }
 
 impl Fetcher {
@@ -154,7 +176,20 @@ impl Fetcher {
             .build()
             .map_err(|error| format!("couldn't set up HTTP: {error}"))?;
         let github_token = std::env::var("GITHUB_TOKEN").ok().map(|t| t.trim().to_owned()).filter(|t| !t.is_empty());
-        Ok(Self { client, bases, github_token })
+        Ok(Self { client, bases, github_token, progress: None })
+    }
+
+    /// Reports how far fetches have got.
+    #[must_use]
+    pub fn with_progress(mut self, progress: Progress) -> Self {
+        self.progress = Some(progress);
+        self
+    }
+
+    fn report(&self, text: impl FnOnce() -> String) {
+        if let Some(progress) = &self.progress {
+            progress.say(text());
+        }
     }
 
     #[must_use]
@@ -189,6 +224,10 @@ impl Fetcher {
     /// Lists a folder of a repository at a commit, recursively. `subdir` empty means the root.
     pub async fn tree(&self, owner: &str, repo: &str, sha: &str, subdir: &str) -> Result<Tree, String> {
         let subdir = subdir.trim_matches('/');
+        self.report(|| {
+            let place = if subdir.is_empty() { format!("{owner}/{repo}") } else { format!("{owner}/{repo}/{subdir}") };
+            format!("Listing {place} @ {}…", sha.get(..8).unwrap_or(sha))
+        });
         let spec = if subdir.is_empty() { sha.to_owned() } else { format!("{sha}:{subdir}") };
         let url = format!("{}/repos/{owner}/{repo}/git/trees/{}?recursive=1", self.bases.github_api, urlpath(&spec));
         let text = self.github(&url).await.map_err(|error| match error {
@@ -293,10 +332,18 @@ impl Fetcher {
             });
         }
         let mut downloaded = Downloaded { skipped, ..Downloaded::default() };
+        let count = files.len();
+        let name =
+            if subdir.is_empty() { repo.to_owned() } else { subdir.rsplit('/').next().unwrap_or(subdir).to_owned() };
+        self.report(|| format!("{name}: 0 of {count} files ({})", human(total)));
         while let Some(result) = tasks.join_next().await {
             let (path, size) = result.map_err(|error| format!("a download task failed: {error}"))??;
             downloaded.files.push(path);
             downloaded.bytes += size;
+            let done = downloaded.files.len();
+            self.report(|| {
+                format!("{name}: {done} of {count} files ({} of {})", human(downloaded.bytes), human(total))
+            });
         }
         downloaded.files.sort();
         Ok(downloaded)
@@ -365,7 +412,9 @@ impl Fetcher {
         {
             return Ok(Cached { text, stale_because: None, age });
         }
-        match fetch_bytes(&self.client, url, limit).await {
+        let label = cache_file.file_stem().and_then(|s| s.to_str()).unwrap_or("download").replace('-', " ");
+        let report = self.progress.clone().map(|progress| (progress, label));
+        match fetch_bytes_reporting(&self.client, url, limit, report.as_ref()).await {
             Ok(bytes) => {
                 let text = String::from_utf8(bytes).map_err(|_| format!("{url} isn't text."))?;
                 if let Some(parent) = cache_file.parent() {
@@ -468,6 +517,16 @@ fn header(response: &reqwest::Response, name: &str) -> Option<String> {
 
 /// Downloads a body, stopping at `limit` bytes.
 async fn fetch_bytes(client: &reqwest::Client, url: &str, limit: u64) -> Result<Vec<u8>, String> {
+    fetch_bytes_reporting(client, url, limit, None).await
+}
+
+/// A download that says how far it has got about once a megabyte, when asked to.
+async fn fetch_bytes_reporting(
+    client: &reqwest::Client,
+    url: &str,
+    limit: u64,
+    report: Option<&(Progress, String)>,
+) -> Result<Vec<u8>, String> {
     use futures_util::StreamExt;
     let response = client.get(url).send().await.map_err(|error| format!("can't reach {}: {error}", host_of(url)))?;
     let status = response.status();
@@ -479,14 +538,23 @@ async fn fetch_bytes(client: &reqwest::Client, url: &str, limit: u64) -> Result<
     {
         return Err(format!("{} is {}; the limit is {}.", url, human(length), human(limit)));
     }
+    let length = response.content_length();
     let mut stream = response.bytes_stream();
     let mut out: Vec<u8> = Vec::new();
+    let mut reported = 0u64;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|error| format!("download interrupted: {error}"))?;
         if out.len() as u64 + chunk.len() as u64 > limit {
             return Err(format!("{url} is larger than the limit of {}.", human(limit)));
         }
         out.extend_from_slice(&chunk);
+        if let Some((progress, label)) = report
+            && out.len() as u64 >= reported + 1024 * 1024
+        {
+            reported = out.len() as u64;
+            let of = length.map(|total| format!(" of {}", human(total))).unwrap_or_default();
+            progress.say(format!("{label}: {}{of}", human(reported)));
+        }
     }
     Ok(out)
 }

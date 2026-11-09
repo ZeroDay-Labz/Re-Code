@@ -189,6 +189,8 @@ Every session is saved as it happens: the event log plus a snapshot of the exact
 ### The interface
 
 - Fits any terminal size, checked by property tests across thousands of sizes. A legend of the keys you can press is always on screen.
+- **A first-run tour** in three steps says what re-code found on your machine, what the model can reach and how approvals, the sandbox and undo work. It starts nothing; `/tour` shows it again, `--no-onboarding` skips it.
+- Click any line of a code block in an answer to copy that line (wrapped parts joined, line numbers left out).
 - The home screen fills your terminal: the lists and the detail pane beside them grow with the window. The Settings tab has a "Home screen" row to keep a composed column instead, and a "Detail pane" row for how much room the details get (a third by default, half, or three fifths). `v` on any model, server, skill, plugin or tool opens everything the pane says in the pager, full width, searchable with `/`.
 - Drag to select and copy anywhere on screen (clipboard and primary selection); double-click a word, triple-click a message; middle-click pastes. F2 hands the mouse to your terminal for its own selection.
 - A side panel with the session (model, tools, context left, files changed, tasks) or the project tree; folders fold, files open in `$EDITOR`. Project paths in the conversation are underlined and clickable.

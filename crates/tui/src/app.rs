@@ -262,6 +262,10 @@ pub enum Overlay {
     },
     /// Installing a skill from a hub: ask, fetch, preview, decide.
     Install(InstallState),
+    /// The first-run tour (`/tour` any time): three steps that only describe.
+    Onboarding {
+        step: usize,
+    },
     /// A marketplace's or a search's plugins: type to filter, Enter fetches one.
     PluginBrowse {
         title: String,
@@ -655,6 +659,12 @@ pub struct App {
     /// Things an event asked of the driver, performed by the run loop after the event (an event
     /// handler returns nothing itself).
     pub pending_actions: Vec<Action>,
+    /// The latest word from a hub fetch ("pdf: 12 of 40 files"), shown while a window waits on it.
+    pub hub_progress: Option<String>,
+    /// `--no-onboarding`: the first-run tour never opens by itself.
+    pub no_onboarding: bool,
+    /// The saved settings have arrived, so whether the tour was shown is known.
+    pub settings_loaded: bool,
     /// Whether the terminal window has focus (for notifications).
     pub focused: bool,
     /// Settings remembered by the driver, as key → value.
@@ -923,6 +933,9 @@ impl App {
             transcript_top: 0,
             toasts: VecDeque::new(),
             pending_actions: Vec::new(),
+            hub_progress: None,
+            no_onboarding: false,
+            settings_loaded: false,
             focused: true,
             settings: BTreeMap::new(),
             panel_tab: PanelTab::Session,
@@ -1154,6 +1167,52 @@ impl App {
         }
     }
 
+    /// The source line of a code block at a screen row, or `None` when the row isn't code. Code rows are
+    /// drawn full width on the code background with a gutter span first: " " (or "12 │ ") starts a
+    /// line and "↪" continues a wrapped one; the language label and inline code don't qualify.
+    fn code_line_at(&mut self, row: u16) -> Option<String> {
+        let (_, y, _, height) = self.transcript_rect;
+        if row < y || row >= y + height {
+            return None;
+        }
+        // Only the model's answers hold rendered code blocks.
+        let (_, _, _, entry) = self.hits.lines.iter().find(|(line_y, _, _, _)| *line_y == row).copied()?;
+        if !matches!(self.transcript.iter().nth(entry), Some(Entry::Assistant(_))) {
+            return None;
+        }
+        let width = self.view_size.0;
+        let options = self.options;
+        let at = self.transcript_top + usize::from(row - y);
+        let mut piece = |line: usize| -> Option<(bool, String, bool)> {
+            let text = self.transcript.lines_between(width, options, line, line + 1).pop()?;
+            code_piece(&text, width)
+        };
+        // A part that didn't fill its row was broken at a space, which wrapping drops: put one back.
+        let join = |before: String, padded: bool, after: &str| {
+            if padded { format!("{before} {after}") } else { before + after }
+        };
+        let (mut continued, mut text, mut padded) = piece(at)?;
+        // Back to the start of the source line, then forward through its wrapped parts.
+        let mut start = at;
+        while continued && start > 0 {
+            let (back, part, part_padded) = piece(start - 1)?;
+            text = join(part, part_padded, &text);
+            continued = back;
+            start -= 1;
+        }
+        let mut next = at + 1;
+        while let Some((true, part, part_padded)) = piece(next) {
+            text = join(text, padded, &part);
+            padded = part_padded;
+            next += 1;
+            if next > at + 200 {
+                break;
+            }
+        }
+        let text = text.trim_end().to_owned();
+        (!text.trim().is_empty()).then_some(text)
+    }
+
     /// Selects and copies the word at a position.
     fn select_word(&mut self, (line, column): (usize, u16)) -> Vec<Action> {
         use unicode_segmentation::UnicodeSegmentation;
@@ -1328,6 +1387,7 @@ impl App {
     /// Takes the latest list of saved sessions: the Home tab shows it, and the picker opens if it was asked for.
     pub fn sessions_listed(&mut self, sessions: Vec<crate::link::SessionSummary>) {
         self.recent_sessions.clone_from(&sessions);
+        self.maybe_onboard();
         if std::mem::take(&mut self.sessions_wanted) {
             self.show_sessions(sessions);
         }
@@ -1825,6 +1885,10 @@ impl App {
         };
         match name {
             "help" => self.run_command(PaletteCommand::Help),
+            "tour" | "welcome" | "onboarding" => {
+                self.overlay = Some(Overlay::Onboarding { step: 0 });
+                Vec::new()
+            }
             "model" => self.run_command(PaletteCommand::SwitchModel),
             "mcp" => tab(self, HomeTab::Mcp),
             "tools" => tab(self, HomeTab::Tools),
@@ -3407,6 +3471,12 @@ impl App {
             {
                 return vec![Action::EditFile(path.clone())];
             }
+            // A line of a code block copies itself (wrapped parts joined, gutter left out).
+            if let Some(text) = self.code_line_at(row) {
+                let shown = crate::wrap::truncate(text.trim(), 40);
+                self.toast(format!("Copied the line: {shown}"), ToastLevel::Success);
+                return vec![Action::Copy(text)];
+            }
             let hit = self.hits.lines.iter().find(|(y, from, to, _)| *y == row && (*from..*to).contains(&column));
             if let Some((_, _, _, entry)) = hit.copied() {
                 self.transcript.toggle(entry);
@@ -3660,6 +3730,9 @@ impl App {
         if matches!(self.overlay, Some(Overlay::Install(_))) {
             return self.install_key(key);
         }
+        if matches!(self.overlay, Some(Overlay::Onboarding { .. })) {
+            return self.onboarding_key(key);
+        }
         if matches!(self.overlay, Some(Overlay::SkillSearch { .. })) {
             return self.skill_search_key(key);
         }
@@ -3781,7 +3854,10 @@ impl App {
                 _ => {}
             },
             // Handled above, before the borrow.
-            Overlay::Install(_) | Overlay::SkillSearch { .. } | Overlay::PluginBrowse { .. } => {}
+            Overlay::Install(_)
+            | Overlay::SkillSearch { .. }
+            | Overlay::PluginBrowse { .. }
+            | Overlay::Onboarding { .. } => {}
             Overlay::ToolFilter { server, tools, selected } => match key.code {
                 KeyCode::Esc => self.overlay = None,
                 KeyCode::Up => *selected = selected.saturating_sub(1),
@@ -4500,6 +4576,39 @@ impl App {
             let filter = format!("{}{}", welcome.filter, text.trim());
             welcome.set_filter(filter, self.welcome_info.as_ref());
         }
+    }
+}
+
+/// A rendered line as part of a code block: whether it continues the line above, and its text without
+/// the gutter. `None` for anything that isn't a code line.
+fn code_piece(line: &ratatui::text::Line<'_>, width: usize) -> Option<(bool, String, bool)> {
+    let code_bg = Some(crate::theme::color(crate::theme::Token::CodeBg));
+    if line.spans.is_empty() || line.spans.iter().any(|span| span.style.bg != code_bg) {
+        return None;
+    }
+    if crate::wrap::line_width(line) < width {
+        return None;
+    }
+    let gutter = line.spans[0].content.as_ref();
+    // The last span is the padding that fills the row, unless the text filled it exactly.
+    let mut body = &line.spans[1..];
+    let padded = body.len() > 1 && body.last().is_some_and(|span| span.content.chars().all(|c| c == ' '));
+    if padded {
+        body = &body[..body.len() - 1];
+    }
+    let rest: String = body.iter().map(|span| span.content.as_ref()).collect();
+    let trimmed = gutter.trim();
+    if gutter == " " {
+        Some((false, rest, padded))
+    } else if trimmed == "↪" {
+        Some((true, rest, padded))
+    } else if let Some(number) = trimmed.strip_suffix('│')
+        && !number.trim().is_empty()
+        && number.trim().chars().all(|c| c.is_ascii_digit())
+    {
+        Some((false, rest, padded))
+    } else {
+        None
     }
 }
 

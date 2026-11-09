@@ -255,8 +255,18 @@ impl Session {
         Self { paths: paths.clone(), extensions, store, project }
     }
 
+    /// On a terminal, progress is one line on stderr that rewrites itself; piped, nothing is printed.
     fn fetcher(&self) -> Result<Fetcher, String> {
-        Fetcher::new(Bases::from_env())
+        let fetcher = Fetcher::new(Bases::from_env())?;
+        if !std::io::stderr().is_terminal() {
+            return Ok(fetcher);
+        }
+        Ok(fetcher.with_progress(recode_extensions::fetch::Progress::new(|text| {
+            let width = crossterm_width().saturating_sub(1);
+            let text: String = text.chars().take(width).collect();
+            eprint!("\r\x1b[2K{text}");
+            let _ = std::io::stderr().flush();
+        })))
     }
 
     fn skill_hub(&self) -> Result<Hub, String> {
@@ -465,7 +475,9 @@ async fn skill(session: &mut Session, action: SkillAction) -> Result<i32, String
         }
         SkillAction::Search { query } => {
             let hub = session.skill_hub()?;
-            let search = hub.search(&query.join(" "), 20).await?;
+            let search = hub.search(&query.join(" "), 20).await;
+            clear_progress();
+            let search = search?;
             if let Some(note) = search.note {
                 eprintln!("{note}");
             }
@@ -476,7 +488,9 @@ async fn skill(session: &mut Session, action: SkillAction) -> Result<i32, String
         }
         SkillAction::Browse { source, limit, query } => {
             let hub = session.skill_hub()?;
-            let page = hub.browse(source.as_deref(), &query.join(" "), limit).await?;
+            let page = hub.browse(source.as_deref(), &query.join(" "), limit).await;
+            clear_progress();
+            let page = page?;
             if let Some(note) = page.note {
                 eprintln!("{note}");
             }
@@ -557,6 +571,7 @@ fn finish_skill(
     decide: Decide,
     json: bool,
 ) -> Result<i32, String> {
+    clear_progress();
     match outcome {
         InstallOutcome::Failed { tap, error } => {
             eprintln!("{tap}: {error}");
@@ -780,6 +795,7 @@ fn finish_plugin(
     decide: Decide,
     json: bool,
 ) -> Result<i32, String> {
+    clear_progress();
     match outcome {
         PluginOutcome::Failed { tap, error } => {
             eprintln!("{tap}: {error}");
@@ -1034,5 +1050,17 @@ fn print_verdict(verdict: &Verdict) {
                 }
             }
         }
+    }
+}
+
+/// The terminal's width for the progress line, or 80 when it can't be told.
+fn crossterm_width() -> usize {
+    std::env::var("COLUMNS").ok().and_then(|c| c.parse().ok()).unwrap_or(80)
+}
+
+/// Clears the progress line before ordinary output.
+fn clear_progress() {
+    if std::io::stderr().is_terminal() {
+        eprint!("\r\x1b[2K");
     }
 }

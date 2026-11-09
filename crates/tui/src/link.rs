@@ -173,6 +173,8 @@ pub enum UiEvent {
     Install(recode_core::extensions::InstallOutcome),
     /// A plugin was staged (or couldn't be), for the install window.
     PluginInstall(recode_core::extensions::PluginOutcome),
+    /// How far a hub fetch has got, for the window waiting on it.
+    HubProgress(String),
     /// Several skills staged at once: each tap with what came of it.
     InstallBatch(Vec<(String, recode_core::extensions::InstallOutcome)>),
     /// Several plugins staged at once.

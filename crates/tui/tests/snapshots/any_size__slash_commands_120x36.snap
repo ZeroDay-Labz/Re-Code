@@ -26,13 +26,13 @@ expression: "screen(&draw(app, width, height))"
 │    Things to check next:                                                                                             │
 ╭ commands ────────────────────────────────────────────────────────────────╮                                           │
 │❯ /help                                                 Keyboard shortcuts│                                           │
+│  /tour                     The three-step introduction from the first run│                                           │
 │  /model                                                      Switch model│                                           │
 │  /mcp                                                         MCP servers│                                           │
-│  /tools                                                      Custom tools│                                           │
-│  /skills                                                           Skills│reflow. 世界 and 🦀 are here to test       │
+│  /tools                                                      Custom tools│reflow. 世界 and 🦀 are here to test       │
+│  /skills                                                           Skills│                                           │
 │  /providers                                  Model providers and API keys│                                           │
 │  /add-dir <folder>                 Let the agent read and change a folder│                                           │
-│  /undo                                  Undo the last turn's file changes│                                           │
 ╰──────────────────────────────────────────────── tab complete · esc close ╯───────────────────────────────────────────╯
 ╭ ● Ready │ DEMO │ demo-model · recorded │ ctx ~6.0k/32k │ 100 tok/s │ tasks 1/3 ──────────────────────────────────────╮
 │ ❯  /                                                                                                                 │

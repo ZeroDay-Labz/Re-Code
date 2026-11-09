@@ -90,7 +90,7 @@ fn reduced_motion() -> bool {
 }
 
 /// Runs the interface, starting at the welcome screen.
-pub async fn run_interactive(link: Link, theme: crate::background::ThemeChoice) -> Result<()> {
+pub async fn run_interactive(link: Link, theme: crate::background::ThemeChoice, onboarding: bool) -> Result<()> {
     let (_guard, mut terminal) = TerminalGuard::new()?;
     // Asked once the terminal is in raw mode and before anything reads keys, so the reply isn't lost.
     let (selection, locked) = theme.resolve();
@@ -103,6 +103,7 @@ pub async fn run_interactive(link: Link, theme: crate::background::ThemeChoice) 
     app.keyboard_enhanced = crossterm::terminal::supports_keyboard_enhancement().unwrap_or(false);
     app.theme = selection;
     app.theme_locked = locked;
+    app.no_onboarding = !onboarding;
     app.open_welcome();
     event_loop(&mut terminal, &mut app, link).await
 }
@@ -275,6 +276,7 @@ fn apply_event(app: &mut App, event: UiEvent) {
                 app.panel_width = width.clamp(crate::view::PANEL_MIN_WIDTH, crate::view::PANEL_MAX_WIDTH);
             }
             app.settings = settings;
+            app.settings_loaded = true;
         }
         UiEvent::UserThemes { themes, problems } => {
             crate::theme::install_user_themes(themes);
@@ -292,14 +294,22 @@ fn apply_event(app: &mut App, event: UiEvent) {
         UiEvent::RuntimeStart(event) => app.runtime_start_event(event),
         UiEvent::ProjectTrust(trust) => app.project_trust = Some(trust),
         UiEvent::McpSearch { query, hits, error } => app.mcp_search_result(&query, hits, error),
-        UiEvent::Install(outcome) => app.install_outcome(outcome),
-        UiEvent::PluginInstall(outcome) => app.plugin_outcome(outcome),
+        UiEvent::Install(outcome) => {
+            app.hub_progress = None;
+            app.install_outcome(outcome);
+        }
+        UiEvent::PluginInstall(outcome) => {
+            app.hub_progress = None;
+            app.plugin_outcome(outcome);
+        }
+        UiEvent::HubProgress(text) => app.hub_progress = Some(crate::sanitize::sanitize(&text)),
         UiEvent::InstallBatch(items) => app.install_batch(items.into_iter().map(|(tap, o)| (tap, Ok(o))).collect()),
         UiEvent::PluginInstallBatch(items) => {
             app.install_batch(items.into_iter().map(|(tap, o)| (tap, Err(o))).collect())
         }
         UiEvent::PluginListings { title, listings, error } => app.plugin_listings(&title, listings, error),
         UiEvent::SkillSearch { source, query, hits, total, sources, note, error } => {
+            app.hub_progress = None;
             app.skill_search_result(crate::install_view::BrowsePage {
                 source,
                 query,

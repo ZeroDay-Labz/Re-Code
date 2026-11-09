@@ -339,8 +339,10 @@ Done ahead of schedule: Anthropic, OpenAI and Gemini reachable (OpenAI-compatibl
 - **Landed 2026-11-08 (M small items, U5):** `/untrust` in the interface and palette, runtime autostart
   (`a` on the start confirmation, `ui:autostart:<id>` holds the exact command, Settings row with `d`), pager
   search (`/`, `n`, `N` over the lines as drawn), a scrolling Help overlay. Fixed: the stdio MCP sandbox read
-  the plugin folders once at startup and not at all from the command line. Click-to-copy a code line (U5)
-  not done; U1–U4 not started.
+  the plugin folders once at startup and not at all from the command line. Since 0.1.9: click-to-copy a code
+  line (U5), hub progress in the TUI and CLI (U2), and the first-run tour (U4, `ui:onboarded`,
+  `--no-onboarding`, `/tour`). 0.1.8 made the home screen fit the terminal and added `v` to read a row's
+  details in full, which covers most of U1; U3 (runtimes fold rows, port-conflict banner) is not started.
 - **Landed 2026-11-08 (production P1, P2, P4; live cloud L):** crash files and `doctor --report`
   (`crates/app/src/crash.rs`), `--version` with commit and date (`build.rs`), a week of logs, GitHub Actions
   CI (gate on Ubuntu, rpm in a Fedora 44 container, deb on Ubuntu 22.04 for an old glibc) and a tag-driven

@@ -17,6 +17,7 @@ pub mod input;
 pub mod install_view;
 pub mod link;
 pub mod markdown;
+pub mod onboarding;
 mod run;
 pub mod runtimes_view;
 pub mod sanitize;

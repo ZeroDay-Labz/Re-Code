@@ -452,6 +452,7 @@ impl App {
 
     /// The driver finished a batch: each tap's outcome (skills as `Ok`, plugins as `Err`).
     pub fn install_batch(&mut self, results: Vec<(String, Result<InstallOutcome, PluginOutcome>)>) {
+        self.hub_progress = None;
         let waiting =
             matches!(&self.overlay, Some(Overlay::Install(InstallState { phase: InstallPhase::Batch { .. }, .. })));
         if !waiting {
@@ -924,7 +925,7 @@ const ASK_PLUGIN_HELP: &str = "A name from the Hermes catalog (better-session-ap
 const ASK_MARKETPLACE_HELP: &str = "A Claude Code marketplace: owner/repo[@ref] (anthropics/claude-plugins-official), a GitHub link, or a folder holding .claude-plugin/marketplace.json. Its manifest is read at a pinned commit; nothing is installed yet.";
 
 /// Draws the install window in whatever phase it's in.
-pub fn draw_install(frame: &mut Frame<'_>, area: Rect, state: &InstallState) {
+pub fn draw_install(frame: &mut Frame<'_>, area: Rect, state: &InstallState, progress: Option<&str>) {
     match &state.phase {
         InstallPhase::Ask => {
             let rect = overlay_area(area, 80, 10);
@@ -950,6 +951,9 @@ pub fn draw_install(frame: &mut Frame<'_>, area: Rect, state: &InstallState) {
             let rect = overlay_area(area, 70, 6);
             let inner = usize::from(rect.width).saturating_sub(4);
             let mut lines = wrap_plain(&format!("Fetching {}…", state.tap), Style::new(), inner);
+            if let Some(progress) = progress {
+                lines.extend(wrap_plain(progress, theme::accent(), inner));
+            }
             let bare = !state.tap.contains('/') || state.tap.starts_with("hermes/");
             if bare && !state.tap.starts_with("update ") && state.kind == InstallKind::Skill {
                 lines.extend(wrap_plain(
@@ -969,7 +973,7 @@ pub fn draw_install(frame: &mut Frame<'_>, area: Rect, state: &InstallState) {
         InstallPhase::Choose { candidates, note, selected, checked } => {
             draw_choose(frame, area, &state.tap, candidates, note.as_deref(), *selected, checked);
         }
-        InstallPhase::Batch { items, selected } => draw_batch(frame, area, state.kind, items, *selected),
+        InstallPhase::Batch { items, selected } => draw_batch(frame, area, state.kind, items, *selected, progress),
         InstallPhase::UpToDate { name, sha } => {
             let rect = overlay_area(area, 70, 6);
             let inner = usize::from(rect.width).saturating_sub(4);
@@ -1441,7 +1445,14 @@ fn tickbox(ticked: bool, base: Style) -> Span<'static> {
 }
 
 /// The batch checklist: one row per thing staged, its verdict, and a tick box for what to install.
-fn draw_batch(frame: &mut Frame<'_>, area: Rect, kind: InstallKind, items: &[BatchItem], selected: usize) {
+fn draw_batch(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    kind: InstallKind,
+    items: &[BatchItem],
+    selected: usize,
+    progress: Option<&str>,
+) {
     let rows = u16::try_from(items.len().min(10) * 2).unwrap_or(20);
     let rect = overlay_area(area, 92, rows + 7);
     let inner = usize::from(rect.width).saturating_sub(4);
@@ -1455,6 +1466,11 @@ fn draw_batch(frame: &mut Frame<'_>, area: Rect, kind: InstallKind, items: &[Bat
         format!("{ready} of {} {what} can be installed; {ticked} ticked.", items.len())
     };
     let mut lines = wrap_plain(&head, Style::new(), inner);
+    if fetching > 0
+        && let Some(progress) = progress
+    {
+        lines.push(Line::styled(truncate(progress, inner), theme::accent()));
+    }
     lines.push(Line::default());
     let first = selected.saturating_sub(9);
     for (index, item) in items.iter().enumerate().skip(first).take(10) {
@@ -1536,6 +1552,7 @@ pub struct SearchView<'a> {
     pub source: Option<&'a str>,
     pub sources: &'a [(String, usize)],
     pub total: usize,
+    pub progress: Option<&'a str>,
 }
 
 /// Thousands separated with a thin space, so 103386 reads as 103 386.
@@ -1554,7 +1571,7 @@ fn grouped(n: usize) -> String {
 /// The index browser: a filter line, the sources with their counts, then a page of hits with their
 /// label, category and where they live.
 pub fn draw_skill_search(frame: &mut Frame<'_>, area: Rect, view: &SearchView<'_>) {
-    let SearchView { query, hits, selected, searching, error, note, ticked, source, sources, total } = *view;
+    let SearchView { query, hits, selected, searching, error, note, ticked, source, sources, total, progress } = *view;
     let rows = u16::try_from(hits.len().min(9) * 2).unwrap_or(18);
     let rect = overlay_area(area, 96, rows + 8 + u16::from(!sources.is_empty()));
     let inner = usize::from(rect.width).saturating_sub(4);
@@ -1601,6 +1618,9 @@ pub fn draw_skill_search(frame: &mut Frame<'_>, area: Rect, view: &SearchView<'_
     if searching && hits.is_empty() && sources.is_empty() {
         lines
             .push(Line::styled("Loading the Hermes index (about 42 MB, fetched once a day and kept)…", theme::muted()));
+        if let Some(progress) = progress {
+            lines.push(Line::styled(truncate(progress, inner), theme::accent()));
+        }
     } else if searching && hits.is_empty() {
         lines.push(Line::styled("Looking…", theme::muted()));
     } else if let Some(error) = error {

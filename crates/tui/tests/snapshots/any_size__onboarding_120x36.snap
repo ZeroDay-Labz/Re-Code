@@ -1,0 +1,39 @@
+---
+source: crates/tui/tests/any_size.rs
+expression: "screen(&draw(app, width, height))"
+---
+                                            █▀▀▄ █▀▀▀     █▀▀▀ █▀▀█ █▀▀▄ █▀▀▀
+                                            █▄▄▀ █▀▀  ▀▀▀ █    █  █ █  █ █▀▀
+                                            █  █ █▄▄▄     █▄▄▄ █▄▄█ █▄▄▀ █▄▄▄
+                                           a coding agent for your own machine
+
+   Home │ Models 5 │ Runtimes │ Providers 3 │ MCP 4 │ Skills 4 │ Plugins 2 │ Tools 2 │ Settings │
+  ╭ Home ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+  │Start ─────────────────────────────────────────────────────────────────────────────────────────────────────────── │
+  │❯ ★ Get free models                                                                                          /free│
+  │                                                                                                                  │
+  │More ─────────────╭ Welcome to re-code ────────────────────────────────────────────────────────╮───────────────── │
+  │  ⌕ Give the model│ ● ○ ○  1 of 3                                                              │              /web│
+  │  ◆ Change theme  │                                                                            │            /theme│
+  │  ⚙ Settings      │ re-code is a coding agent for your own machine. It reads and changes       │               tab│
+  │                  │ files in this folder with your approval, using a model on your GPU or one  │                  │
+  │Sessions are saved│ in the cloud.                                                              │                  │
+  │                  │                                                                            │                  │
+  │                  │ What it found                                                              │                  │
+  │                  │   ● Ollama 0.40.14: 5 local models                                         │                  │
+  │                  │   ○ No cloud keys yet. Some providers have free models; f sets one up.     │                  │
+  │                  │                                                                            │                  │
+  │                  │ Nothing starts by itself. When you're ready, pick a model on the Models    │                  │
+  │                  │ tab: ● fits your GPU, ◐ spills into memory, ○ is too large.                │                  │
+  │                  │                                                                            │                  │
+  │                  │ enter next  m models  f free cloud models  esc skip                        │                  │
+  │                  ╰────────────────────────────────────────────────────────────────────────────╯                  │
+  │                                                                                                                  │
+  │                                                                                                                  │
+  │                                                                                                                  │
+  │                                                                                                                  │
+  │                                                                                                                  │
+  ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+  GPU     ━━━━━━━●──────────────────────────────────────────────────────── 2.0 of 16.0 GiB used  AMD Radeon RX 6900 XT
+  Memory  ━━━━━━━━━━━━━●───────────────────────────────────────────────────────── 19.0 of 94.0 GiB used  Ryzen 9 5950X
+                           enter open  ↑↓ choose  d delete chat  tab next  ^R rescan  ^C quit

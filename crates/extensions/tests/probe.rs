@@ -133,3 +133,12 @@ async fn a_server_that_is_not_running_is_explained_plainly() {
     assert!(error.starts_with("Nothing is answering at http://127.0.0.1:9/stream"), "{error}");
     assert!(!error.contains("rmcp::"), "no internal type names: {error}");
 }
+
+#[tokio::test]
+async fn a_crashing_server_explains_itself_through_its_error_output_and_never_writes_to_the_terminal() {
+    // Like a Node server that dies on start: a stack trace on stderr, then exit. That output must come
+    // back in the error, never pass through to the terminal (where it would be drawn over the interface).
+    let script = "echo 'Error: Cannot find module server.mjs' >&2; echo '    at Module._resolveFilename' >&2; exit 1";
+    let McpProbe::Failed { error } = probe(&server(script, &[])).await else { panic!("a crash is a failure") };
+    assert!(error.contains("It said: Error: Cannot find module server.mjs"), "{error}");
+}

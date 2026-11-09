@@ -5,6 +5,29 @@ and versions follow [Semantic Versioning](https://semver.org/). Nothing has been
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-08
+
+### Added
+
+- A three-step tour on the first run: what re-code found (your local runtime and models, cloud keys),
+  what the model can reach (MCP servers, skills, plugins, web search), and how it stays in your hands
+  (approvals, the sandbox, undo and rewind, trust). It starts nothing; keys jump straight to the Models
+  tab, free cloud models, web search or the skill browser. It opens once, never for anyone with saved
+  sessions, `/tour` shows it again, and `--no-onboarding` keeps it shut.
+- Clicking a line of a code block in an answer copies that line: wrapped parts joined, line numbers
+  left out.
+- Hub fetches report progress: the install, checklist and skill browser windows show "Listing
+  owner/repo…", "pdf: 12 of 40 files (80 kB of 260 kB)" and the Hermes index download by the megabyte;
+  the command line shows the same on one line that rewrites itself (only on a terminal).
+
+### Fixed
+
+- A stdio MCP server's own error output was drawn straight over the interface (a crashing Node server
+  painted its whole stack trace across the screen). The MCP library inherits the terminal's stderr
+  unless told otherwise, overriding re-code's setting. A server's error output now goes to the log,
+  and when it fails to start, the error names the line that explains it, such as `Error: Cannot find
+  module '…/rea.mjs'` for a server whose files the sandbox hides.
+
 ## [0.1.8] - 2026-11-08
 
 ### Added

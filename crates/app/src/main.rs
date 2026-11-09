@@ -73,6 +73,9 @@ struct Cli {
     /// Don't use or change re-code's memory for this run (its index stays out of the prompt).
     #[arg(long)]
     no_memory: bool,
+    /// Don't open the three-step introduction on the first run (`/tour` still shows it).
+    #[arg(long)]
+    no_onboarding: bool,
 
     /// With --print: tools that may run without asking, by name (others that would ask are denied).
     #[arg(long, value_delimiter = ',', value_name = "TOOL", requires = "print")]
@@ -201,7 +204,7 @@ async fn main() -> Result<()> {
             let theme = config.theme()?;
             let link =
                 chat::spawn(paths, ollama_url, config.ollama.num_ctx, cli.resume, cli.add_dir, None, cli.no_memory);
-            recode_tui::run_interactive(link, theme).await?;
+            recode_tui::run_interactive(link, theme, !cli.no_onboarding).await?;
         }
     }
     Ok(())
